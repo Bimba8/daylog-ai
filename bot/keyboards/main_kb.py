@@ -19,7 +19,7 @@ def get_main_kb() -> ReplyKeyboardMarkup:
     kb = [
         [KeyboardButton(text="📝 Записать день")],
         [KeyboardButton(text="📚 Мой дневник"), KeyboardButton(text="📊 Статистика")],
-        [KeyboardButton(text="⚙️ Настройки")]
+        [KeyboardButton(text="❤️ Поддержать проект"), KeyboardButton(text="⚙️ Настройки")]
     ]
     
     return ReplyKeyboardMarkup(
@@ -43,6 +43,7 @@ def get_settings_menu_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text="🌍 Часовой пояс", callback_data="set_tz"))
     builder.add(InlineKeyboardButton(text="⏰ Время напоминания", callback_data="set_time"))
+    builder.add(InlineKeyboardButton(text="❓ Помощь", callback_data="open_help_menu"))
     builder.adjust(1)
     return builder.as_markup()
 
@@ -66,6 +67,13 @@ def get_cancel_kb() -> ReplyKeyboardMarkup:
         keyboard=[[kb]],
         resize_keyboard=True
     )
+
+# FIX: BL-07 — Инлайн-кнопка «Завершить запись» вместо ненадёжного стоп-слова «пока».
+# Юзер видит её под каждым ответом AI в диалоге и может нажать в любой момент.
+def get_finish_diary_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text="✅ Завершить запись", callback_data="finish_diary"))
+    return builder.as_markup()
     
 def get_history_kb(current_id: int, has_prev: bool, has_next: bool) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
@@ -80,4 +88,32 @@ def get_history_kb(current_id: int, has_prev: bool, has_next: bool) -> InlineKey
         
     # Выстраиваем кнопки в один ряд (если их две)
     builder.adjust(2)
+    return builder.as_markup()
+
+def get_donate_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    
+    builder.add(InlineKeyboardButton(text="🪙 Крипта (EVM, SOL)", callback_data="donate_crypto"))
+    builder.add(InlineKeyboardButton(text="💳 Рубли (СБП, Карты)", url="https://pay.cloudtips.ru/p/b5bcdbd6"))                           # ВСТАВИТЬ ССЫЛКУ НА CLOUDTIPS
+    builder.add(InlineKeyboardButton(text="⭐️ Telegram Stars", callback_data="donate_stars"))
+    
+    builder.adjust(1)
+    return builder.as_markup()
+
+def get_donate_back_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text="⬅️ Назад к способам", callback_data="donate_back"))
+    return builder.as_markup()
+
+def get_stars_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    
+    builder.add(InlineKeyboardButton(text="1 ⭐️", callback_data="stars_1"))  # тест
+    builder.add(InlineKeyboardButton(text="50 ⭐️", callback_data="stars_50"))
+    builder.add(InlineKeyboardButton(text="100 ⭐️", callback_data="stars_100"))
+    builder.add(InlineKeyboardButton(text="250 ⭐️", callback_data="stars_250"))
+    builder.add(InlineKeyboardButton(text="500 ⭐️", callback_data="stars_500"))
+    builder.add(InlineKeyboardButton(text="⬅️ Назад к способам", callback_data="donate_back"))
+    
+    builder.adjust(3, 2, 1)            # поменять на (2, 2, 1) после удаления тест кнопки
     return builder.as_markup()

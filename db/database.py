@@ -2,12 +2,21 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from db.models import Base # Импортируем базовый класс, чтобы алхимия знала о наших таблицах
 from config import config
 
+# FIX: ARCH-04 — Явная настройка connection pool.
+# pool_size: количество постоянных соединений в пуле (по умолчанию было 5 — мало).
+# max_overflow: доп. соединения сверх pool_size при пиковой нагрузке.
+# pool_recycle: пересоздание соединения каждые 1800с, чтобы PostgreSQL не убил stale-коннект.
+# pool_pre_ping: проверка «жив ли коннект» перед использованием (SELECT 1).
 engine = create_async_engine(
     config.DATABASE_URL, 
-    echo=config.DB_ECHO  # <--- Теперь Алхимия слушает наш конфиг
-) # Создаем движок (подключение к SQLite). "sqlite+aiosqlite" означает, что мы используем SQLite в асинхронном режиме. Файл базы будет называться diary.db и появится в корне твоего проекта.
+    echo=config.DB_ECHO,
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=1800,
+    pool_pre_ping=True,
+)
 
-async_session = async_sessionmaker(engine, expire_on_commit=False) # Создаем "фабрику сессий". Бот будет использовать её, чтобы открывать сессию для каждого нового действия.
+async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 # Функция, которая физически создаст таблицы по нашим "чертежам"
 async def init_db():

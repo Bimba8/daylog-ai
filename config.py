@@ -6,6 +6,7 @@ class Setting(BaseSettings):
     OPENROUTER_API_KEY: str
     DATABASE_URL: str
     DB_ECHO: bool = False
+    REDIS_URL: str
     
     # Настройки Pydantic: говорим ему читать файл .env
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
