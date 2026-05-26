@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import BigInteger, DateTime, Text, func, ForeignKey, String
+from sqlalchemy import BigInteger, DateTime, Text, func, ForeignKey, String, Integer
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 # Это базовый класс, от которого будут наследоваться все наши таблицы. 
@@ -21,6 +21,8 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     timezone: Mapped[str] = mapped_column(String, default="Europe/Moscow")
     reminder_time: Mapped[str] = mapped_column(String, default="20:00")
+    digest_day: Mapped[int] = mapped_column(Integer, default=0)
+    digest_time: Mapped[int] = mapped_column(Integer, default=12)
     
     # Связь с записями дневника: user.entries вернет все DiaryEntry этого юзера
     entries: Mapped[list["DiaryEntry"]] = relationship(back_populates="user", lazy="selectin")

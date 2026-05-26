@@ -25,3 +25,5 @@ __pycache__/
 
 files/
 daylog-ai-doc.md
+# Log files
+logs/

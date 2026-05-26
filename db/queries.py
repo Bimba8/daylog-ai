@@ -227,3 +227,17 @@ async def get_adjacent_entry(
     
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+async def update_user_digest_day(session: AsyncSession, tg_id: int, day_idx: int) -> User:
+    """Обновить день дайджеста. Создаёт юзера, если не найден."""
+    user, _ = await get_or_create_user(session, tg_id)
+    user.digest_day = day_idx
+    await session.flush()
+    return user
+
+async def update_user_digest_time(session: AsyncSession, tg_id: int, time_idx: int) -> User:
+    """Обновить время дайджеста. Создаёт юзера, если не найден."""
+    user, _ = await get_or_create_user(session, tg_id)
+    user.digest_time = time_idx
+    await session.flush()
+    return user

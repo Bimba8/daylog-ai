@@ -44,6 +44,7 @@ def get_settings_menu_kb() -> InlineKeyboardMarkup:
     builder.add(InlineKeyboardButton(text="🌍 Часовой пояс", callback_data="set_tz"))
     builder.add(InlineKeyboardButton(text="⏰ Время напоминания", callback_data="set_time"))
     builder.add(InlineKeyboardButton(text="❓ Помощь", callback_data="open_help_menu"))
+    builder.add(InlineKeyboardButton(text="📰 Настройки дайджеста", callback_data="digest_menu"))
     builder.adjust(1)
     return builder.as_markup()
 
@@ -62,7 +63,7 @@ def get_timezone_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 def get_cancel_kb() -> ReplyKeyboardMarkup:
-    kb = KeyboardButton(text="❌ Отмена")
+    kb = KeyboardButton(text="Отмена")
     return ReplyKeyboardMarkup(
         keyboard=[[kb]],
         resize_keyboard=True
@@ -116,4 +117,41 @@ def get_stars_kb() -> InlineKeyboardMarkup:
     builder.add(InlineKeyboardButton(text="⬅️ Назад к способам", callback_data="donate_back"))
     
     builder.adjust(3, 2, 1)            # поменять на (2, 2, 1) после удаления тест кнопки
+    return builder.as_markup()
+
+def get_start_diary_inline_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text="📝 Записать день", callback_data="write_report"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+def get_digest_settings_menu_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text="📅 День недели", callback_data="choose_digest_day"))
+    builder.add(InlineKeyboardButton(text="🕒 Время отправки", callback_data="choose_digest_time"))
+    builder.add(InlineKeyboardButton(text="⬅️ Назад", callback_data="settings_main"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+def get_digest_day_kb(selected_day: int | None = None) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    days = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+    
+    for day in range(0, 7):
+        text = f"{days[day]} ✅" if day == selected_day else days[day]
+        builder.add(InlineKeyboardButton(text=text, callback_data=f"dday_{day}"))
+    builder.add(InlineKeyboardButton(text="⬅️ Назад", callback_data="settings_digest"))
+        
+    builder.adjust(3, 4, 1)
+    return builder.as_markup()
+    
+def get_digest_time_kb(selected_time: int | None = None) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    
+    for time in range(0, 24, 2):
+        text = f"{time}:00 ✅" if time == selected_time else f"{time}:00"
+        builder.add(InlineKeyboardButton(text=text, callback_data=f"dtime_{time}"))
+    builder.add(InlineKeyboardButton(text="⬅️ Назад", callback_data="settings_digest"))
+        
+    builder.adjust(3)
     return builder.as_markup()

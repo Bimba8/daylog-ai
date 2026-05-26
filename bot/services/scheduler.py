@@ -1,5 +1,7 @@
-import logging
+from loguru import logger
 from urllib.parse import urlparse
+import asyncio
+from zoneinfo import ZoneInfo
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.base import StorageKey, BaseStorage  # FIX: CQ-04 — тип для storage
@@ -9,13 +11,13 @@ from apscheduler.jobstores.redis import RedisJobStore
 from apscheduler.jobstores.base import JobLookupError
 from config import config
 from db.database import async_session
-from db.queries import check_today_entry, get_last_week_entries, get_user
+from db.queries import check_today_entry, get_last_week_entries, get_user, get_all_users
 from bot.keyboards.main_kb import get_report_kb
 from bot.services.saver import finalize_diary_entry
 from bot.services.ai import generate_weekly_digest
 from bot.utils.telegram import safe_send
 
-logger = logging.getLogger(__name__)
+logger = logger.bind(module="SCHEDULER")
 
 # FIX: ARCH-01 — RedisJobStore для persistent jobs (daily_reminder, weekly_digest).
 # При рестарте бота эти задачи восстанавливаются из Redis автоматически.
@@ -113,7 +115,7 @@ async def send_daily_reminder(user_id: int) -> None:
             if already_written:
                 return
         except Exception as e:
-            logger.error(f"Ошибка при проверке записи юзера {user_id}: {e}")
+            logger.error("Ошибка проверки записи юзера {}: {}", user_id, e)
             return
     
     await safe_send(
@@ -174,7 +176,7 @@ async def run_night_cleaner(bot: Bot, storage: BaseStorage, user_id: int, chat_i
             state=state
         )
     except Exception as e:
-        logger.error(f"Night cleaner: ошибка сохранения для юзера {user_id}: {e}")
+        logger.error("Night cleaner: ошибка сохранения для юзера {}: {}", user_id, e)
         return
     
     await safe_send(
@@ -234,60 +236,58 @@ def cancel_night_cleaner(user_id: int) -> None:
 # Переживает рестарт. Bot через get_bot().
 # ──────────────────────────────────────────────
 
-async def run_weekly_digest(user_id: int) -> None:
-    """Сгенерировать и отправить еженедельный AI-дайджест.
-    Bot берётся через get_bot() — эта job хранится в Redis.
-    """
-    bot = get_bot()
+async def _process_single_user_digest(bot: Bot, user_id: int, tz_str: str) -> None:
+    """Хелпер: генерит дайджест для одного юзера (быстрая сессия БД)."""
     async with async_session() as session:
-        try:
-            # FIX: BL-04 — Загружаем юзера, чтобы получить его таймзону для корректных границ недели
-            user = await get_user(session, user_id)
-            if not user:
-                return
-            entries = await get_last_week_entries(session, user_id, tz_str=user.timezone)
-        except Exception as e:
-            logger.error(f"Digest: ошибка загрузки записей юзера {user_id}: {e}")
-            return
+        entries = await get_last_week_entries(session, user_id, tz_str=tz_str)
         
-        if len(entries) < 2:
-            await safe_send(
-                bot, user_id,
-                text=(
-                    "📊 <b>Мало данных для дайджеста</b>\n\n"
-                    "На прошлой неделе было слишком мало записей для глубокого анализа от нейросети. Жду твоих подробных историй на этой неделе!"
-                )
-            )
-            return
-        
-        digest = await generate_weekly_digest(entries)
-        
-        if not digest:
-            await safe_send(
-                bot, user_id,
-                text=(
-                    "⚠️ <b>Дайджест задерживается</b>\n\n"
-                    "Сервера ИИ прилегли отдохнуть, поэтому сгенерировать отчет за неделю не вышло. Попробуем в следующий понедельник!"
-                )
-            )
-            return
-        
-        await safe_send(bot, user_id, text=digest)
+    if len(entries) < 2:
+        return # Слишком мало данных, скипаем тихо или можно отправить уведомление
     
-def schedule_weekly_digest(bot: Bot, user_id: int, tz_str: str = "Europe/Moscow") -> None:
-    """Запланировать еженедельный дайджест в Redis.
-    Bot НЕ передаётся в kwargs — job-функция достанет его через get_bot().
-    """
-    # FIX: ARCH-01 — jobstore='redis': задача переживёт рестарт бота
+    digest = await generate_weekly_digest(entries)
+    if digest:
+        await safe_send(bot, user_id, text=digest)
+
+
+async def run_global_weekly_digest() -> None:
+    """Фабрика дайджестов: берет всех юзеров, бьет по 10 человек, делает паузы."""
+    logger.info("Фабрика дайджестов запущена")
+    bot = get_bot()
+    
+    async with async_session() as session:
+        users = await get_all_users(session)
+
+    target_users = []
+    for user in users:
+        try:
+            now_local = datetime.now(ZoneInfo(user.timezone))
+            # Проверяем совпадение дня и часа
+            if now_local.weekday() == user.digest_day and now_local.hour == user.digest_time:
+                target_users.append(user)
+        except Exception as e:
+            logger.error(f"Скипаем юзера {user.telegram_id}, ошибка таймзоны: {e}")
+    
+    batch_size = 10
+    for i in range(0, len(target_users), batch_size):
+        batch = target_users[i:i + batch_size]
+        logger.info("Обработка пачки #{}, юзеров: {}", i // batch_size + 1, len(batch))
+        
+        for user in batch:
+            await _process_single_user_digest(bot, user.telegram_id, user.timezone)
+            
+        # Пауза 65 сек перед следующей пачкой (лимит Гугла 15 RPM)
+        if i + batch_size < len(target_users):
+            await asyncio.sleep(65)
+
+
+def schedule_global_weekly_digest() -> None:
+    """Регистрирует ОДНУ общую задачу на всех."""
     scheduler.add_job(
-        func=run_weekly_digest,
+        func=run_global_weekly_digest,
         trigger='cron',
-        day_of_week='mon',
-        hour=10,
         minute=0,
-        timezone=tz_str,
-        id=f"digest_{user_id}",
+        timezone='UTC',
+        id="global_weekly_digest",
         replace_existing=True,
         jobstore='redis',
-        kwargs={'user_id': user_id},
     )

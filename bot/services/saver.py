@@ -1,5 +1,5 @@
 import asyncio
-import logging
+from loguru import logger
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +7,7 @@ from db.database import async_session
 from db.queries import add_diary_entry
 from bot.services.analytics import generate_and_save_metrics
 
-logger = logging.getLogger(__name__)
+logger = logger.bind(module="SAVER")
 
 # Множество для хранения ссылок на фоновые задачи, чтобы GC не собрал их раньше времени
 _background_tasks: set[asyncio.Task] = set()
@@ -18,7 +18,7 @@ def _task_done_callback(task: asyncio.Task):
         return
     exc = task.exception()
     if exc:
-        logger.error(f"Фоновая задача AI-метрик упала с ошибкой: {exc}", exc_info=exc)
+        logger.opt(exception=exc).error("Фоновая задача AI-метрик упала")
 
 # FIX: CRIT-04 — Двойная стратегия управления сессиями:
 # 1) Из хендлера (session передан) — используем middleware-сессию, чтобы не плодить
@@ -71,11 +71,11 @@ async def cancel_background_tasks() -> None:
     if not _background_tasks:
         return
     
-    logger.info(f"Отменяю {len(_background_tasks)} фоновых задач...")
+    logger.info("Отмена {} фоновых задач", len(_background_tasks))
     for task in _background_tasks:
         task.cancel()
     
     # Ждём завершения всех задач (cancelled или finished), подавляя CancelledError
     await asyncio.gather(*_background_tasks, return_exceptions=True)
     _background_tasks.clear()
-    logger.info("Все фоновые задачи завершены.")
+    logger.info("Все фоновые задачи завершены")

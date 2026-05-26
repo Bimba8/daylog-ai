@@ -4,9 +4,10 @@ from aiogram import types, Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart, Command
 from aiogram.types import FSInputFile
+from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.queries import get_or_create_user, update_user_timezone, update_user_time
-from bot.keyboards.main_kb import get_main_kb, get_settings_menu_kb, get_timezone_kb, get_onboarding_start_kb, get_report_kb, ru_timezones
+from db.queries import get_or_create_user, update_user_timezone, update_user_time, update_user_digest_day, update_user_digest_time
+from bot.keyboards.main_kb import get_main_kb, get_settings_menu_kb, get_timezone_kb, get_onboarding_start_kb, get_report_kb, ru_timezones, get_digest_day_kb, get_digest_time_kb, get_digest_settings_menu_kb
 from bot.handlers.states import SettingState, OnboardingState
 from bot.services.scheduler import schedule_daily_reminder
 
@@ -133,11 +134,16 @@ async def setting_non_text(message: types.Message):
     
 
 @router.message(F.text == "⚙️ Настройки")
-async def show_settings_menu(message: types.Message):
-    await message.answer(
-        text="⚙️ <b>Настройки</b>\n\nЧто будем менять?",
-        reply_markup=get_settings_menu_kb()
-    )
+@router.callback_query(F.data == "settings_main")
+async def show_settings_menu(event: types.Message | types.CallbackQuery):
+    text = "⚙️ <b>Настройки</b>\n\nЧто будем менять?"
+    kb = get_settings_menu_kb()
+    
+    if isinstance(event, types.Message):
+        await event.answer(text=text, reply_markup=kb)
+    else:
+        await event.message.edit_text(text=text, reply_markup=kb)
+        await event.answer()
 
 @router.callback_query(F.data == "set_tz")
 async def start_tz_selection(callback: types.CallbackQuery, state: FSMContext):
@@ -219,7 +225,7 @@ async def process_setting_time(message: types.Message, state: FSMContext, sessio
     await state.clear()
     
 @router.message(Command("cancel"))
-@router.message(F.text == "❌ Отмена")
+@router.message(F.text == "Отмена")
 async def cancel_handler(message: types.Message, state: FSMContext):
     current_state = await state.get_state()
     
@@ -231,3 +237,51 @@ async def cancel_handler(message: types.Message, state: FSMContext):
         text="🚫 <b>Действие отменено</b>",
         reply_markup=get_main_kb(),
     )
+
+@router.callback_query(F.data == "digest_menu")
+@router.callback_query(F.data == "settings_digest")
+async def show_digest_settings(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        text="⚙️ Настройки дайджеста. Что будем менять?",
+        reply_markup=get_digest_settings_menu_kb()
+    )
+    
+@router.callback_query(F.data == "choose_digest_day")
+async def show_digest_day_selection(callback: types.CallbackQuery, session: AsyncSession):
+    user, _ = await get_or_create_user(session, callback.from_user.id)
+    await callback.message.edit_text(
+        text="📅 Выбери день недели для получения дайджеста:",
+        reply_markup=get_digest_day_kb(user.digest_day)
+    )
+
+@router.callback_query(F.data == "choose_digest_time")
+async def show_digest_time_selection(callback: types.CallbackQuery, session: AsyncSession):
+    user, _ = await get_or_create_user(session, callback.from_user.id)
+    await callback.message.edit_text(
+        text="🕒 Выбери время отправки дайджеста:",
+        reply_markup=get_digest_time_kb(user.digest_time)
+    )
+
+@router.callback_query(F.data.startswith("dday_"))
+async def process_digest_day(callback: types.CallbackQuery, session: AsyncSession):
+    day_idx = int(callback.data.split("_")[1])
+    user = await update_user_digest_day(session, callback.from_user.id, day_idx)
+    new_kb = get_digest_day_kb(selected_day=day_idx)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=new_kb)
+    except TelegramBadRequest:
+        # Игнорируем, если клавиатура не изменилась
+        pass
+    await callback.answer()
+    
+@router.callback_query(F.data.startswith("dtime_"))
+async def process_digest_time(callback: types.CallbackQuery, session: AsyncSession):
+    time_idx = int(callback.data.split("_")[1])
+    user = await update_user_digest_time(session, callback.from_user.id, time_idx)
+    new_kb = get_digest_time_kb(selected_time=time_idx)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=new_kb)
+    except TelegramBadRequest:
+        # Игнорируем, если клавиатура не изменилась
+        pass
+    await callback.answer()

@@ -36,6 +36,7 @@ async def cmd_daylog(message: types.Message, state: FSMContext, session: AsyncSe
         ),
         reply_markup=get_cancel_kb()
         )
+     
     
 @router.message(DiaryState.waiting_for_story)
 async def process_story(message: types.Message, state: FSMContext, session: AsyncSession):  # FIX: CRIT-04 — добавлен session

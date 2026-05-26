@@ -1,5 +1,5 @@
 import json
-import logging
+from loguru import logger
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +7,7 @@ from db.queries import get_user_entries, get_entry_count, get_or_create_user
 from bot.keyboards.main_kb import get_report_kb
 from datetime import datetime, timedelta
 
-logger = logging.getLogger(__name__)
+logger = logger.bind(module="HANDLER")
 
 router = Router()
 
@@ -36,7 +36,7 @@ def calculate_stats(entries: list, total_count: int, tz_str: str = "UTC") -> dic
                     sums[metric] += data.get(metric, 0)
                 count_with_metrics += 1
             except (json.JSONDecodeError, TypeError) as e:
-                logger.warning(f"Ошибка парсинга метрик записи {entry.id}: {e}")
+                logger.warning("Ошибка парсинга метрик записи {}: {}", entry.id, e)
     
     if count_with_metrics > 0:    
         for metric in sums:

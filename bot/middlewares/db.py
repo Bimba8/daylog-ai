@@ -1,7 +1,10 @@
 from typing import Any, Awaitable, Callable, Dict
+from loguru import logger
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 from db.database import async_session
+
+_logger = logger.bind(module="DB")
 
 
 class DbSessionMiddleware(BaseMiddleware):
@@ -37,4 +40,5 @@ class DbSessionMiddleware(BaseMiddleware):
             except Exception:
                 # Откатываем ВСЕ незакоммиченные изменения, чтобы не оставлять «грязные» данные
                 await session.rollback()
+                _logger.opt(exception=True).error("Транзакция хендлера откачена")
                 raise

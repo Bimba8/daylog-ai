@@ -1,5 +1,5 @@
 import asyncio
-import logging
+from loguru import logger
 from aiogram import Bot
 from aiogram.exceptions import (
     TelegramForbiddenError,
@@ -8,7 +8,7 @@ from aiogram.exceptions import (
     TelegramNetworkError,
 )
 
-logger = logging.getLogger(__name__)
+logger = logger.bind(module="TELEGRAM")
 
 
 # FIX: CRIT-05 — Без этой обёртки любой заблокировавший бота юзер ронял шедулер/хендлер
@@ -24,27 +24,27 @@ async def safe_send(bot: Bot, chat_id: int, **kwargs) -> bool:
         return True
     except TelegramForbiddenError:
         # Юзер заблокировал бота — отправка невозможна, просто пропускаем
-        logger.warning(f"User {chat_id} blocked the bot, skipping send")
+        logger.warning("Юзер {} заблокировал бота, пропуск отправки", chat_id)
         return False
     except TelegramRetryAfter as e:
         # Telegram просит подождать (flood control) — ждём и пробуем ещё раз
-        logger.warning(f"Rate limited for {chat_id}, retrying after {e.retry_after}s")
+        logger.warning("Rate limit для {}, повтор через {}с", chat_id, e.retry_after)
         await asyncio.sleep(e.retry_after)
         try:
             await bot.send_message(chat_id=chat_id, **kwargs)
             return True
         except Exception as retry_err:
-            logger.error(f"Retry failed for {chat_id}: {retry_err}")
+            logger.error("Повторная отправка для {} не удалась: {}", chat_id, retry_err)
             return False
     except TelegramBadRequest as e:
         # Некорректный запрос (text слишком длинный, chat не найден и т.д.)
-        logger.warning(f"Bad request sending to {chat_id}: {e}")
+        logger.warning("Некорректный запрос для {}: {}", chat_id, e)
         return False
     except TelegramNetworkError as e:
-        logger.error(f"Network error sending to {chat_id}: {e}")
+        logger.error("Сетевая ошибка отправки для {}: {}", chat_id, e)
         return False
     except Exception as e:
-        logger.error(f"Unexpected error sending to {chat_id}: {e}")
+        logger.error("Неожиданная ошибка отправки для {}: {}", chat_id, e)
         return False
 
 
@@ -58,5 +58,5 @@ async def safe_delete(message) -> bool:
     except (TelegramBadRequest, TelegramForbiddenError):
         return False
     except Exception as e:
-        logger.warning(f"Failed to delete message: {e}")
+        logger.warning("Не удалось удалить сообщение: {}", e)
         return False

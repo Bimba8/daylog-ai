@@ -1,18 +1,18 @@
 import json
-import logging
+from loguru import logger
 from aiogram import Bot
 from bot.services.ai import get_ai_metrics
 from bot.utils.telegram import safe_send  # FIX: CRIT-05
 from db.database import async_session
 from db.queries import update_diary_metrics
 
-logger = logging.getLogger(__name__)
+logger = logger.bind(module="AI")
 
 async def generate_and_save_metrics(bot: Bot, chat_id: int, entry_id: int, user_text: str):
     response = await get_ai_metrics(user_text)
     
     if not response:
-        logger.warning("AI не смог составить валидный JSON для метрик")
+        logger.warning("ИИ не вернул валидные метрики")
         return
 
     metrics = json.dumps(response, ensure_ascii=False)
@@ -27,7 +27,7 @@ async def generate_and_save_metrics(bot: Bot, chat_id: int, entry_id: int, user_
             await session.commit()
         except Exception as e:
             await session.rollback()
-            logger.error(f"Не удалось сохранить метрики для записи {entry_id}: {e}")
+            logger.error("Не удалось сохранить метрики для записи {}: {}", entry_id, e)
             return
     
     mood_score = response.get("mood", 0)
@@ -45,4 +45,4 @@ async def generate_and_save_metrics(bot: Bot, chat_id: int, entry_id: int, user_
         await safe_send(bot, chat_id, text=final_text)
     
     except Exception as e:
-        logger.error(f"Не удалось вывести среднюю оценку метрик - {e}")
+        logger.error("Ошибка расчёта/отправки средних метрик: {}", e)

@@ -1,98 +1,16 @@
 import json
-import logging
-import openai
-import asyncio
-from openai import AsyncOpenAI
+import aiohttp
+from loguru import logger
 from config import config
+from tenacity import retry, wait_exponential_jitter, retry_if_exception_type, stop_after_attempt
 from bot.services.prompts import SYSTEM_PROMPT, METRICS_SYSTEM_PROMPT, DIGEST_SYSTEM_PROMPT
 
-logger = logging.getLogger(__name__)
+logger = logger.bind(module="AI")
 
-API_KEY = config.OPENROUTER_API_KEY
-PRIMARY_MODEL = "z-ai/glm-4.5-air:free"
-BACKUP_MODEL = "qwen/qwen3-next-80b-a3b-instruct:free"
-BASE_URL = "https://openrouter.ai/api/v1"
-
-# Обязательные ключи и допустимые диапазоны для AI-метрик
+# Обязательные ключи для AI-метрик
 _METRIC_KEYS = ("mood", "energy", "stress", "productivity")
-_METRIC_RANGE = range(1, 6)  # 1..5
-
-client = AsyncOpenAI(
-    base_url=BASE_URL,
-    api_key=API_KEY
-)
-
-# FIX: CRIT-06 — Ограничиваем количество одновременных HTTP-запросов к OpenRouter.
-# Без этого при наплыве пользователей каждый создавал неограниченное количество
-# параллельных запросов, исчерпывая rate limits и баланс на API.
-_ai_semaphore = asyncio.Semaphore(10)
-
-
-async def _call_with_retry(
-    messages: list[dict],
-    temperature: float = 0.6,
-    timeout: float = 30.0,
-    max_retries: int = 2,
-    overall_deadline: float = 45.0,
-    **extra_kwargs
-) -> str | None:
-    """
-    Универсальная функция вызова LLM с retry + fallback на запасную модель.
-    FIX: CRIT-06 — Семафор + общий deadline чтобы юзер не ждал 4+ минут.
-    Возвращает текст ответа или None, если все попытки провалились.
-    """
-    # FIX: CRIT-06 — Семафор ограничивает параллелизм, чтобы не завалить API
-    async with _ai_semaphore:
-        # Общий deadline: если все retry + fallback не уложились в overall_deadline — сдаёмся.
-        # Раньше worst-case мог занять 4+ минуты (юзер видел "Анализирую..." всё это время).
-        deadline = asyncio.get_event_loop().time() + overall_deadline
-        
-        for model in (PRIMARY_MODEL, BACKUP_MODEL):
-            for attempt in range(max_retries):
-                remaining = deadline - asyncio.get_event_loop().time()
-                if remaining <= 0:
-                    logger.error("Overall deadline exceeded, aborting AI call")
-                    return None
-                
-                try:
-                    # asyncio.wait_for гарантирует, что один запрос не зависнет дольше timeout.
-                    # min(timeout, remaining) учитывает остаток общего deadline.
-                    response = await asyncio.wait_for(
-                        client.chat.completions.create(
-                            model=model,
-                            messages=messages,
-                            temperature=temperature,
-                            **extra_kwargs
-                        ),
-                        timeout=min(timeout, remaining)
-                    )
-                    return response.choices[0].message.content
-                
-                except asyncio.TimeoutError:
-                    logger.warning(f"[{model}] Timeout (попытка {attempt + 1}/{max_retries})")
-                
-                except openai.RateLimitError:
-                    wait = 2 ** attempt
-                    logger.warning(f"[{model}] RateLimitError. Жду {wait}с (попытка {attempt + 1}/{max_retries})")
-                    # min(wait, remaining) — не ждём дольше, чем осталось до deadline
-                    await asyncio.sleep(min(wait, max(0, remaining)))
-                
-                except Exception as e:
-                    wait = 2 ** attempt
-                    logger.error(f"[{model}] Ошибка: {e}. Жду {wait}с (попытка {attempt + 1}/{max_retries})")
-                    await asyncio.sleep(min(wait, max(0, remaining)))
-            
-            logger.warning(f"Модель {model} исчерпала {max_retries} попыток, переключаемся...")
-        
-        logger.error("Все модели недоступны, возвращаем None")
-        return None
-
 
 def _validate_metrics(data: dict) -> dict | None:
-    """
-    Проверяет, что ответ AI содержит все нужные метрики с корректными значениями.
-    Приводит значения к int и зажимает в диапазон 1-5.
-    """
     try:
         for key in _METRIC_KEYS:
             val = data.get(key)
@@ -106,64 +24,159 @@ def _validate_metrics(data: dict) -> dict | None:
         
         return data
     except (ValueError, TypeError) as e:
-        logger.warning(f"Ошибка валидации метрик: {e}")
+        logger.warning("Ошибка валидации метрик: {}", e)
         return None
 
-
-async def get_ai_response(user_text: str) -> str | None:
-    """Получить ответ/вопрос AI на текст пользователя (диалог дневника).
+class AIRouter:
+    def __init__(self):
+        self.session: aiohttp.ClientSession | None = None
+        self.groq_api_key = config.GROQ_API_KEY
+        self.gemini_api_key = config.GEMINI_API_KEY
+        
+    async def start(self):
+        """Открываем глобальную сессию при старте бота"""
+        self.session = aiohttp.ClientSession()
+        logger.info("HTTP-сессия открыта")
+        
+    async def close(self):
+        """Закрываем сессию при выключении"""
+        if self.session:
+            await self.session.close()
+            logger.info("HTTP-сессия закрыта")
     
-    FIX: ARCH-02 — Интерактивный запрос (юзер ждёт ответа в чате).
-    Жёсткий overall_deadline=35с, чтобы юзер не видел «Анализирую...» дольше полуминуты.
-    max_retries=2 — только 2 попытки на модель, потом fallback.
-    """
+    # Декоратор: ждем от 2 до 10 секунд, максимум 3 попытки, 
+    # ловим только ошибки HTTP (например 429 или 500)
+    @retry(
+        wait=wait_exponential_jitter(initial=2, max=10),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(aiohttp.ClientResponseError),
+        reraise=True # Пробросит ошибку наверх, если попытки кончатся
+    )
+    async def _call_groq(self, model: str, messages: list[dict], is_json: bool = False) -> dict:
+        """Приватный метод для стука в Groq"""
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.groq_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.1 if is_json else 0.6  # Для JSON нужна минимальная температура!
+        }
+        
+        # Если попросили JSON — динамически добавляем ключ в дикт
+        if is_json:
+            payload["response_format"] = {"type": "json_object"}
+        
+        # self.session УЖЕ должен быть инициализирован в start()
+        async with self.session.post(url, headers=headers, json=payload) as response:
+            response.raise_for_status() # Бросает ClientResponseError при 4xx/5xx
+            return await response.json()
+        
+    @retry(
+        wait=wait_exponential_jitter(initial=2, max=10),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(aiohttp.ClientResponseError),
+        reraise=True # Пробросит ошибку наверх, если попытки кончатся
+    )
+    async def _call_google(self, model: str, messages: list[dict], is_json: bool = False) -> dict:
+        """Приватный метод для стука в Google (Gemini).
+        Сам конвертирует стандартные messages в payload Гугла.
+        """
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_api_key}"
+        
+        # Конвертируем формат: Google ждет role="user" или "model", а контент внутри "parts" [{"text": ...}]
+        google_contents = []
+        for m in messages:
+            # Если это system prompt, Google обычно просит передавать его отдельно (systemInstruction), 
+            # но для простоты мы можем притвориться, что это тоже сказал user.
+            role = "user" if m["role"] in ("user", "system") else "model"
+            google_contents.append({
+                "role": role,
+                "parts": [{"text": m["content"]}]
+            })
+    
+        payload = {"contents": google_contents}
+        headers = {"Content-Type": "application/json"}
+        
+        if is_json:
+            payload["generationConfig"] = {
+                "responseMimeType": "application/json"
+            }
+        
+        async with self.session.post(url, headers=headers, json=payload) as response:
+            response.raise_for_status() # Бросит ошибку при 429/500, tenacity перехватит
+            return await response.json()
+            
+            
+ai_router = AIRouter()
+MAIN_GROQ_MODEL = "llama-3.3-70b-versatile"
+SECOND_GROQ_MODEL = "llama-3.1-8b-instant"
+GOOGLE_MODEL = "gemini-3.1-flash-lite"
+
+# --- Фасады (интерфейсы для остального кода не меняем!) ---
+async def get_ai_response(user_text: str) -> str | None:
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_text}
     ]
-    return await _call_with_retry(
-        messages, temperature=0.6, timeout=25.0, max_retries=2, overall_deadline=35.0
-    )
-
+    
+    try:
+        # Уровень 1: Пробуем Groq 70B
+        response = await ai_router._call_groq(MAIN_GROQ_MODEL, messages)
+        return response['choices'][0]['message']['content']
+    
+    except Exception as e:
+        logger.warning("Groq {} недоступен ({}), фоллбэк → {}", MAIN_GROQ_MODEL, e, SECOND_GROQ_MODEL)
+        
+        try:
+            # Уровень 2: Фоллбэк внутри Groq (8B)
+            response = await ai_router._call_groq(SECOND_GROQ_MODEL, messages)
+            return response['choices'][0]['message']['content']
+        except Exception as e2:
+            logger.warning("Groq лёг ({}), кросс-провайдер фоллбэк → {}", e2, GOOGLE_MODEL)
+            
+            try:
+                # Уровень 3: Кросс-провайдерный фоллбэк
+                response = await ai_router._call_google(GOOGLE_MODEL, messages)
+                # У Гугла другой путь к тексту ответа в JSON:
+                return response['candidates'][0]['content']['parts'][0]['text']
+            except Exception as e3:
+                # Уровень 4: Сдаемся
+                logger.error("Все AI-провайдеры лежат: {}", e3)
+                return None
+        
 
 async def get_ai_metrics(user_text: str) -> dict | None:
-    """Получить AI-метрики настроения/энергии/стресса/продуктивности из текста дневника.
-    
-    FIX: ARCH-02 — Фоновый запрос (юзер не ждёт напрямую, запущен через asyncio.Task).
-    overall_deadline=60с на каждую попытку — щедрее, чем интерактивный,
-    но всё равно ограничен, чтобы фоновая задача не висела вечно.
-    """
     messages = [
         {"role": "system", "content": METRICS_SYSTEM_PROMPT},
         {"role": "user", "content": user_text}
     ]
     
-    for attempt in range(3):
-        raw_text = await _call_with_retry(
-            messages,
-            temperature=0.1,
-            timeout=40.0,
-            max_retries=2,
-            overall_deadline=60.0,
-            response_format={"type": "json_object"}
-        )
-        
-        if not raw_text:
-            return None
+    raw_text = None
+    
+    try:
+        response = await ai_router._call_groq("llama-3.1-8b-instant", messages, is_json=True)
+        raw_text = response['choices'][0]['message']['content']
+    except Exception as e:
+        logger.warning("Groq 8B недоступен для метрик ({}), фоллбэк → Google", e)
         
         try:
+            response = await ai_router._call_google("gemini-2.5-flash", messages, is_json=True)
+            raw_text = response['candidates'][0]['content']['parts'][0]['text']
+        except Exception as e2:
+            logger.error("Все провайдеры лежат для метрик: {}", e2)
+            return None
+        
+    if raw_text:
+        try:
             metrics_dict = json.loads(raw_text)
-            validated = _validate_metrics(metrics_dict)
-            if validated:
-                return validated
-            logger.warning(f"Метрики не прошли валидацию (попытка {attempt + 1}/3)")
+            return _validate_metrics(metrics_dict)  # Твоя старая добрая валидация
         except json.JSONDecodeError:
-            logger.warning(f"Кривой JSON от AI (попытка {attempt + 1}/3)")
-            await asyncio.sleep(2 ** attempt)
-    
-    logger.error("Не удалось получить валидные метрики за все попытки")
-    return None
-
+            logger.error("ИИ вернул невалидный JSON: {}", raw_text[:200])
+            return None
 
 async def generate_weekly_digest(entries: list) -> str | None:
     """Сгенерировать еженедельный AI-дайджест на основе записей."""
@@ -174,12 +187,23 @@ async def generate_weekly_digest(entries: list) -> str | None:
         if not entry.ai_metrics:
             compiled_text += f"Дата: {date_str}\nОценки: нет данных\nТекст: {entry.user_text}\n\n"
             continue
-        metrics = json.loads(entry.ai_metrics)
-        compiled_text += f"Дата: {date_str}\nОценки: Настроение - {metrics.get('mood', '?')}, Энергия - {metrics.get('energy', '?')}, Стресс - {metrics.get('stress', '?')}, Продуктивность - {metrics.get('productivity', '?')}\nТекст: {entry.user_text}\n\n"
+            
+        try:
+            metrics = json.loads(entry.ai_metrics)
+            compiled_text += f"Дата: {date_str}\nОценки: Настроение - {metrics.get('mood', '?')}, Энергия - {metrics.get('energy', '?')}, Стресс - {metrics.get('stress', '?')}, Продуктивность - {metrics.get('productivity', '?')}\nТекст: {entry.user_text}\n\n"
+        except json.JSONDecodeError:
+            compiled_text += f"Дата: {date_str}\nОценки: ошибка парсинга\nТекст: {entry.user_text}\n\n"
     
     messages = [
         {"role": "system", "content": DIGEST_SYSTEM_PROMPT},
         {"role": "user", "content": compiled_text}
     ]
     
-    return await _call_with_retry(messages, temperature=0.3, timeout=90.0)
+    try:
+        # Для дайджестов идем СРАЗУ в Гугл (нужно большое контекстное окно), без каскада Groq
+        response = await ai_router._call_google("gemini-2.5-flash", messages)
+        # Парсим ответ по наркоманской структуре Гугла
+        return response['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e:
+        logger.error("Ошибка генерации дайджеста: {}", e)
+        return None
