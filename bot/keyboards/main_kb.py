@@ -25,6 +25,7 @@ def get_main_kb() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=kb,
         resize_keyboard=True,
+        is_persistent=True,
         input_field_placeholder="Выбери действие..."
     )
 
