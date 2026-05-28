@@ -41,12 +41,15 @@ async def generate_and_save_metrics(bot: Bot, chat_id: int, entry_id: int, user_
         avg_score = round((mood_score + energy_score + adjusted_stress + productivity_score) / 4, 1)
         final_text = f"📊 Итоги дня: {avg_score} / 5\n\n📝 {summary_text}"
         # safe_send обрабатывает TelegramForbiddenError и rate limits
-        await safe_send(bot, chat_id, text=final_text, reply_markup=get_main_kb())
+        # СНАЧАЛА удаляем сообщение с часиками/загрузкой
         if loading_msg_id:
             try:
                 await bot.delete_message(chat_id, loading_msg_id)
             except Exception:
                 pass
+                
+        # И ТОЛЬКО ПОТОМ отправляем финальные метрики с главной клавиатурой
+        await safe_send(bot, chat_id, text=final_text, reply_markup=get_main_kb())
     
     except Exception as e:
         logger.error("Ошибка расчёта/отправки средних метрик: {}", e)
