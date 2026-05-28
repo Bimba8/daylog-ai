@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Код приложения
 COPY --chown=appuser:appuser . .
 
+# Отдаем права на саму директорию /app нашему юзеру
+RUN chown appuser:appuser /app
+
 USER appuser
 
 CMD ["python", "main.py"]
