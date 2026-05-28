@@ -3,6 +3,7 @@ from loguru import logger
 from aiogram import Bot
 from bot.services.ai import get_ai_metrics
 from bot.utils.telegram import safe_send
+from bot.keyboards.main_kb import get_main_kb
 from db.database import async_session
 from db.queries import update_diary_metrics
 
@@ -40,7 +41,7 @@ async def generate_and_save_metrics(bot: Bot, chat_id: int, entry_id: int, user_
         avg_score = round((mood_score + energy_score + adjusted_stress + productivity_score) / 4, 1)
         final_text = f"📊 Итоги дня: {avg_score} / 5\n\n📝 {summary_text}"
         # safe_send обрабатывает TelegramForbiddenError и rate limits
-        await safe_send(bot, chat_id, text=final_text)
+        await safe_send(bot, chat_id, text=final_text, reply_markup=get_main_kb())
         if loading_msg_id:
             try:
                 await bot.delete_message(chat_id, loading_msg_id)
