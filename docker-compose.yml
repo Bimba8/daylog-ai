@@ -48,6 +48,15 @@ services:
       resources:
         limits:
           memory: 256M
+  
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: daylog_dozzle
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "8888:8080"
 
 networks:
   backend:
