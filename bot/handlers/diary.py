@@ -162,7 +162,7 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
         return
     
     elif turn_count >= 2:
-        loading_msg = await message.answer("💾 <b>Всё записал в дневник</b>\n\n<i>Сейчас нейронка подобьет итоги дня, секунду...</i>", reply_markup=get_main_kb())
+        loading_msg = await message.answer("💾 <b>Всё записал в дневник</b>\n\n<i>Сейчас нейронка подобьет итоги дня, секунду...</i>")
         await finalize_diary_entry(
             bot=message.bot, 
             chat_id=message.chat.id, 
@@ -254,8 +254,7 @@ async def finish_diary_callback(callback: types.CallbackQuery, state: FSMContext
     
     # 2. Отправляем заглушку И запоминаем её ID
     loading_msg = await callback.message.answer(
-        text="💾 <b>Всё записал в дневник</b>\n\n<i>Сейчас нейронка подобьет итоги дня, секунду...</i>",
-        reply_markup=get_main_kb()
+        text="💾 <b>Всё записал в дневник</b>\n\n<i>Сейчас нейронка подобьет итоги дня, секунду...</i>"
     )
     
     # 3. Переносим вызов finalize_diary_entry ниже и прокидываем ID

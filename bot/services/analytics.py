@@ -43,20 +43,19 @@ async def generate_and_save_metrics(bot: Bot, chat_id: int, entry_id: int, user_
         
         # safe_send обрабатывает TelegramForbiddenError и rate limits
         # Если у нас есть ID заглушки, просто меняем её текст на итоги дня
+        # 1. Сначала молча убиваем заглушку (так как на ней нет меню, интерфейс не дернется)
         if loading_msg_id:
             try:
-                await bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=loading_msg_id,
-                    text=final_text
-                    # reply_markup тут передавать не нужно, клава уже висит на этом сообщении
-                )
+                await bot.delete_message(chat_id, loading_msg_id)
             except Exception:
-                # Если юзер успел сам удалить заглушку, просто шлем новым сообщением
-                await safe_send(bot, chat_id, text=final_text, reply_markup=get_main_kb())
-        else:
-            # Фолбек, если заглушки изначально не было
-            await safe_send(bot, chat_id, text=final_text, reply_markup=get_main_kb())
+                pass
+                
+        # 2. Отправляем финальные итоги и жестко привязываем к ним клавиатуру
+        await bot.send_message(
+            chat_id=chat_id, 
+            text=final_text, 
+            reply_markup=get_main_kb()
+        )
     
     except Exception as e:
         logger.error("Ошибка расчёта/отправки средних метрик: {}", e)
