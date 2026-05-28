@@ -63,7 +63,6 @@ services:
 networks:
   backend:
     driver: bridge
-    internal: true    # DB/Redis недоступны из интернета
   external:
     driver: bridge    # Bot → Telegram API / LLM API
 
