@@ -1,13 +1,22 @@
 FROM python:3.11-slim
 
+# Системные зависимости (asyncpg)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq5 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Непривилегированный пользователь
+RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
+
 WORKDIR /app
 
-# Копируем зависимости
+# Зависимости отдельным слоем (кэширование Docker layers)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем весь остальной код
-COPY . .
+# Код приложения
+COPY --chown=appuser:appuser . .
 
-# Команда для запуска твоего бота
+USER appuser
+
 CMD ["python", "main.py"]

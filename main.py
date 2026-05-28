@@ -16,6 +16,7 @@ from bot.handlers.info import router as info_router
 from bot.handlers.common import router as common_router
 from bot.services.scheduler import scheduler, schedule_daily_reminder, schedule_global_weekly_digest, set_bot
 from bot.services.saver import cancel_background_tasks
+from bot.middlewares.throttle import ThrottleMiddleware
 from bot.middlewares.db import DbSessionMiddleware
 
 from bot.logging_config import setup_logging
@@ -70,7 +71,8 @@ async def main():
     storage = RedisStorage.from_url(config.REDIS_URL)
     dp = Dispatcher(storage=storage)
     
-    # Middleware для инъекции DB-сессии во все хендлеры
+    # Middleware: throttle ПЕРВЫМ (до открытия DB-сессии)
+    dp.update.middleware(ThrottleMiddleware())
     dp.update.middleware(DbSessionMiddleware())
     
     # Регистрация роутеров (порядок важен: common_router — catch-all, всегда последний)

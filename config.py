@@ -8,6 +8,7 @@ class Setting(BaseSettings):
     DATABASE_URL: str
     DB_ECHO: bool = False
     REDIS_URL: str
+    REDIS_PASSWORD: str
     LOG_LEVEL: str = "INFO"
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str

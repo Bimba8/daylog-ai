@@ -72,14 +72,25 @@ async def show_stars_donate(callback: types.CallbackQuery):
     await callback.message.edit_text(text=STARS_TEXT, reply_markup=get_stars_kb())
     await callback.answer()
 
+_VALID_STAR_AMOUNTS = {1, 50, 100, 250, 500}
+
 @router.callback_query(F.data.startswith("stars_"))
 async def send_stars_invoice(callback: types.CallbackQuery):
-    amount = int(callback.data.split("_")[1])
+    try:
+        amount = int(callback.data.split("_")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Некорректные данные")
+        return
+    
+    if amount not in _VALID_STAR_AMOUNTS:
+        await callback.answer("Некорректная сумма")
+        return
+    
     prices = [LabeledPrice(label="⭐️ Поддержка", amount=amount)]
     await callback.message.answer_invoice(
         title="Поддержка DayLog AI",
         description="Вклад в оплату серверов и нейросетей. Делаем дневник умнее вместе! 🧠",
-        payload="donate_stars_payload",
+        payload=f"donate_stars_{amount}",
         provider_token="",
         currency="XTR",
         prices=prices
@@ -88,6 +99,9 @@ async def send_stars_invoice(callback: types.CallbackQuery):
     
 @router.pre_checkout_query()
 async def process_pre_checkout(pre_checkout_query: types.PreCheckoutQuery):
+    if not pre_checkout_query.invoice_payload.startswith("donate_stars_"):
+        await pre_checkout_query.answer(ok=False, error_message="Неизвестный платёж")
+        return
     await pre_checkout_query.answer(ok=True)
     
 @router.message(F.successful_payment)
