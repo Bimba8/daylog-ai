@@ -9,6 +9,9 @@ class Setting(BaseSettings):
     DB_ECHO: bool = False
     REDIS_URL: str
     LOG_LEVEL: str = "INFO"
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
     
     # Настройки Pydantic: говорим ему читать файл .env
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

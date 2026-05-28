@@ -35,12 +35,19 @@ async def show_history_start(message: types.Message, session: AsyncSession):
         
 @router.callback_query(F.data.startswith("hist_"))
 async def process_history_pagination(callback: types.CallbackQuery, session: AsyncSession):
-    # Разрезаем колбек, чтобы понять куда листать и от какого ID
+    """Пагинация записей дневника с валидацией callback_data."""
     parts = callback.data.split("_")
-    action = parts[1]
-    current_id = int(parts[2])
+    if len(parts) < 3:
+        await callback.answer("Некорректные данные")
+        return
     
-    # Ищем нужную запись
+    action = parts[1]
+    try:
+        current_id = int(parts[2])
+    except ValueError:
+        await callback.answer("Некорректные данные")
+        return
+    
     target_entry = await get_adjacent_entry(session, callback.from_user.id, current_id, action)
     
     if not target_entry:

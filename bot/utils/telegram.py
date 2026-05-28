@@ -11,8 +11,6 @@ from aiogram.exceptions import (
 logger = logger.bind(module="TELEGRAM")
 
 
-# FIX: CRIT-05 — Без этой обёртки любой заблокировавший бота юзер ронял шедулер/хендлер
-# необработанным TelegramForbiddenError, а rate limit от Telegram останавливал весь event loop.
 async def safe_send(bot: Bot, chat_id: int, **kwargs) -> bool:
     """
     Безопасная отправка сообщения. Перехватывает все ошибки Telegram API.

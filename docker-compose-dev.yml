@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: daylog_db_dev
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-daylog_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-daylog_password}
+      POSTGRES_DB: ${POSTGRES_DB:-daylog}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine
+    container_name: daylog_redis_dev
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    volumes:
+      - redis_data_dev:/data
+
+volumes:
+  postgres_data_dev:
+  redis_data_dev:

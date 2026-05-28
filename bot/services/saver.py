@@ -20,26 +20,23 @@ def _task_done_callback(task: asyncio.Task):
     if exc:
         logger.opt(exception=exc).error("Фоновая задача AI-метрик упала")
 
-# FIX: CRIT-04 — Двойная стратегия управления сессиями:
-# 1) Из хендлера (session передан) — используем middleware-сессию, чтобы не плодить
-#    параллельные подключения и сохранить атомарность транзакции хендлера.
-# 2) Из scheduler (session=None) — открываем standalone-сессию с явным commit/rollback,
-#    т.к. scheduler работает вне контекста middleware.
+# Двойная стратегия сессий:
+# session передан → middleware-сессия (хендлер), session=None → standalone (scheduler).
 async def finalize_diary_entry(
     bot: Bot, 
     chat_id: int, 
     user_id: int, 
-    text: str, 
+    text: str,
     state: FSMContext = None, 
-    session: AsyncSession = None
+    session: AsyncSession = None,
+    loading_msg_id: int | None = None
 ):
+    """Финализация записи дневника: сохранение в БД + запуск фонового AI-анализа."""
     if session:
-        # Хендлер передал middleware-сессию — flush произойдёт в add_diary_entry,
-        # а финальный commit сделает middleware после завершения хендлера.
+        # Middleware-сессия — flush в add_diary_entry, коммит в middleware
         new_entry = await add_diary_entry(session, user_id, text)
     else:
-        # Вызов из scheduler/night_cleaner — middleware здесь нет,
-        # поэтому открываем свою сессию и сами управляем транзакцией.
+        # Standalone-сессия (scheduler/night_cleaner) — явный commit/rollback
         async with async_session() as standalone_session:
             try:
                 new_entry = await add_diary_entry(standalone_session, user_id, text)
@@ -48,26 +45,21 @@ async def finalize_diary_entry(
                 await standalone_session.rollback()
                 raise
     
-    # Чистим стейт FSM, если он передан (для живых диалогов)
+    # Очистка FSM-стейта (для живых диалогов)
     if state:
         await state.clear()
         
-    # Запускаем ИИ-анализ в фоне — он откроет собственную сессию в analytics.py,
-    # т.к. может работать минутами и не должен блокировать ответ юзеру.
-    task = asyncio.create_task(generate_and_save_metrics(bot, chat_id, new_entry.id, text))
+    # AI-анализ в фоне — откроет собственную сессию в analytics.py
+    task = asyncio.create_task(generate_and_save_metrics(bot, chat_id, new_entry.id, text, loading_msg_id))
     _background_tasks.add(task)
     task.add_done_callback(_task_done_callback)
     
     return new_entry
 
 
-# FIX: CQ-05 — Graceful shutdown: отмена всех фоновых AI-задач при остановке бота.
-# Без этого при shutdown фоновые задачи могут пытаться писать в уже закрытую БД/сессию,
-# вызывая OperationalError и замусоривая логи трейсбеками.
+# Graceful shutdown: отмена фоновых задач до закрытия БД.
 async def cancel_background_tasks() -> None:
-    """Отменить все фоновые задачи и дождаться их завершения.
-    Вызывается из on_shutdown в main.py перед закрытием engine.
-    """
+    """Отменить все фоновые задачи и дождаться их завершения."""
     if not _background_tasks:
         return
     
@@ -75,7 +67,6 @@ async def cancel_background_tasks() -> None:
     for task in _background_tasks:
         task.cancel()
     
-    # Ждём завершения всех задач (cancelled или finished), подавляя CancelledError
     await asyncio.gather(*_background_tasks, return_exceptions=True)
     _background_tasks.clear()
     logger.info("Все фоновые задачи завершены")

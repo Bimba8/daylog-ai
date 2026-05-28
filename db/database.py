@@ -2,14 +2,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from db.models import Base # Импортируем базовый класс, чтобы алхимия знала о наших таблицах
 from config import config
 
-# FIX: ARCH-04 — Явная настройка connection pool.
-# pool_size: количество постоянных соединений в пуле (по умолчанию было 5 — мало).
-# max_overflow: доп. соединения сверх pool_size при пиковой нагрузке.
-# pool_recycle: пересоздание соединения каждые 1800с, чтобы PostgreSQL не убил stale-коннект.
-# pool_pre_ping: проверка «жив ли коннект» перед использованием (SELECT 1).
-# echo отключен — SQL-логи управляются через InterceptHandler в logging_config.py,
-# который перехватывает sqlalchemy.engine logger и выводит в cyan-формат.
-# Уровень SQL-логирования контролируется через DB_ECHO в .env.
+# Connection pool: pool_pre_ping защищает от stale-коннектов,
+# pool_recycle=1800 пересоздаёт их до таймаута PostgreSQL.
+# SQL-логирование управляется через DB_ECHO в .env.
 engine = create_async_engine(
     config.DATABASE_URL, 
     echo=False,

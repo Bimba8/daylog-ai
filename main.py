@@ -15,7 +15,7 @@ from bot.handlers.stats import router as stats_router
 from bot.handlers.info import router as info_router
 from bot.handlers.common import router as common_router
 from bot.services.scheduler import scheduler, schedule_daily_reminder, schedule_global_weekly_digest, set_bot
-from bot.services.saver import cancel_background_tasks  # FIX: CQ-05 — graceful shutdown
+from bot.services.saver import cancel_background_tasks
 from bot.middlewares.db import DbSessionMiddleware
 
 from bot.logging_config import setup_logging
@@ -50,8 +50,8 @@ async def on_startup(bot: Bot):
 
 async def on_shutdown(bot: Bot):
     logger.info("Остановка бота...")
-    # FIX: CQ-05 — Сначала отменяем фоновые AI-задачи, потом закрываем БД.
-    # Порядок важен: если закрыть engine первым, фоновые задачи получат OperationalError.
+    # Порядок остановки: сначала фоновые задачи, потом БД.
+    # Иначе задачи получат OperationalError на закрытом engine.
     await ai_router.close()
     await cancel_background_tasks()
     scheduler.shutdown(wait=False)
@@ -61,11 +61,8 @@ async def on_shutdown(bot: Bot):
 async def main():
     await init_db()
     
-    # FIX: ARCH-05 — Все ключевые объекты создаются внутри main(), а не на уровне модуля.
-    # Преимущества:
-    # 1) Тестируемость — можно подменить bot/storage mock'ом без monkey-patching.
-    # 2) Корректный lifecycle — объекты создаются после init_db(), а не при импорте.
-    # 3) Чистый shutdown — нет глобальных ссылок, которые живут после завершения main().
+    # Bot, storage, dispatcher создаются здесь (не на уровне модуля)
+    # для корректного lifecycle и тестируемости.
     bot = Bot(
         token=config.BOT_TOKEN, 
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
@@ -76,7 +73,7 @@ async def main():
     # Middleware для инъекции DB-сессии во все хендлеры
     dp.update.middleware(DbSessionMiddleware())
     
-    # Регистрация роутеров (порядок важен: common_router — catch-all, всегда последний!)
+    # Регистрация роутеров (порядок важен: common_router — catch-all, всегда последний)
     dp.include_router(start_router)
     dp.include_router(stats_router)
     dp.include_router(history_router)
@@ -84,9 +81,8 @@ async def main():
     dp.include_router(diary_router)
     dp.include_router(common_router)
     
-    # FIX: ARCH-01 — Устанавливаем ссылку на bot ДО старта scheduler,
-    # чтобы persistent jobs из Redis могли достать bot через get_bot()
-    # сразу после загрузки из jobstore.
+    # Ссылка на bot устанавливается ДО scheduler.start(),
+    # чтобы persistent jobs из Redis могли использовать get_bot().
     set_bot(bot)
     scheduler.start()
     

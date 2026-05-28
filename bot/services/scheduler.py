@@ -19,11 +19,8 @@ from bot.utils.telegram import safe_send
 
 logger = logger.bind(module="SCHEDULER")
 
-# FIX: ARCH-01 — RedisJobStore для persistent jobs (daily_reminder, weekly_digest).
-# При рестарте бота эти задачи восстанавливаются из Redis автоматически.
-# Используем db=1, чтобы не конфликтовать с FSM-хранилищем aiogram (db=0).
-# Ephemeral jobs (nudge, night_cleaner) остаются в default MemoryJobStore —
-# они привязаны к текущему FSM-сеансу и не нужны после рестарта.
+# RedisJobStore (db=1) для persistent jobs (daily, digest).
+# Ephemeral jobs (nudge, cleaner) — в MemoryJobStore (default).
 _parsed_redis = urlparse(config.REDIS_URL)
 _redis_jobstore = RedisJobStore(
     host=_parsed_redis.hostname or 'localhost',
@@ -37,18 +34,12 @@ scheduler = AsyncIOScheduler(
     jobstores={'redis': _redis_jobstore},
 )
 
-# FIX: ARCH-01 — Bot нельзя сериализовать в Redis (он содержит aiohttp-сессии,
-# SSL-контексты и прочие несериализуемые объекты).
-# Поэтому persistent jobs (хранящиеся в Redis) не получают bot через kwargs.
-# Вместо этого они достают его через get_bot() из модульной переменной,
-# которая инициализируется один раз при старте бота через set_bot().
+# Bot не сериализуется в Redis → persistent jobs получают его через get_bot().
 _bot_instance: Bot | None = None
 
 
 def set_bot(bot: Bot):
-    """Сохранить ссылку на бот-инстанс для использования в scheduled jobs.
-    Вызывается один раз из main.py перед scheduler.start().
-    """
+    """Инициализация ссылки на бот для scheduled jobs."""
     global _bot_instance
     _bot_instance = bot
 
@@ -62,7 +53,6 @@ def get_bot() -> Bot:
 
 # ──────────────────────────────────────────────
 # Nudge — ephemeral, MemoryJobStore (default)
-# Bot передаётся в kwargs напрямую — он не сериализуется, а хранится в памяти.
 # ──────────────────────────────────────────────
 
 async def send_nudge_message(bot: Bot, chat_id: int) -> None:
@@ -84,7 +74,6 @@ def schedule_nudge(bot: Bot, user_id: int, chat_id: int) -> None:
         id=f"nudge_{user_id}",
         replace_existing=True,
         kwargs={'bot': bot, 'chat_id': chat_id}
-        # jobstore не указан → default MemoryJobStore
     )
 
 def cancel_nudge(user_id: int) -> None:
@@ -96,14 +85,10 @@ def cancel_nudge(user_id: int) -> None:
 
 # ──────────────────────────────────────────────
 # Daily Reminder — persistent, RedisJobStore
-# Переживает рестарт бота. Bot достаётся через get_bot().
 # ──────────────────────────────────────────────
 
 async def send_daily_reminder(user_id: int) -> None:
-    """Отправить ежедневное напоминание, если юзер ещё не писал сегодня.
-    Вызывается scheduler'ом — bot берётся из get_bot(), а не из kwargs,
-    потому что эта job хранится в Redis и kwargs должны быть сериализуемыми.
-    """
+    """Ежедневное напоминание (если юзер ещё не писал сегодня)."""
     bot = get_bot()
     async with async_session() as session:
         try:
@@ -128,13 +113,9 @@ async def send_daily_reminder(user_id: int) -> None:
     )
         
 def schedule_daily_reminder(bot: Bot, user_id: int, time_str: str, tz_str: str) -> None:
-    """Запланировать ежедневное напоминание в Redis.
-    Параметр bot принимается для совместимости с вызовами из хендлеров,
-    но НЕ передаётся в kwargs — job-функция достанет его через get_bot().
-    """
+    """Запланировать ежедневное напоминание (persistent, Redis)."""
     hour, minute = map(int, time_str.split(":"))
     
-    # FIX: ARCH-01 — jobstore='redis': задача переживёт рестарт бота
     scheduler.add_job(
         func=send_daily_reminder,
         trigger='cron',
@@ -150,14 +131,10 @@ def schedule_daily_reminder(bot: Bot, user_id: int, time_str: str, tz_str: str) 
 
 # ──────────────────────────────────────────────
 # Night Cleaner — ephemeral, MemoryJobStore (default)
-# Привязан к текущему FSM-сеансу: storage не сериализуется.
 # ──────────────────────────────────────────────
 
 async def run_night_cleaner(bot: Bot, storage: BaseStorage, user_id: int, chat_id: int) -> None:
-    """Автосохранение зависшего FSM-диалога в 3:00 ночи.
-    Создаёт FSM-контекст вручную через StorageKey, достаёт незавершённую историю
-    и сохраняет её в БД. Вызывается без middleware — finalize откроет standalone-сессию.
-    """
+    """Автосохранение зависшего диалога в 3:00 ночи по таймзоне юзера."""
     key = StorageKey(bot_id=bot.id, chat_id=chat_id, user_id=user_id)
     state = FSMContext(storage=storage, key=key)
     
@@ -189,15 +166,9 @@ async def run_night_cleaner(bot: Bot, storage: BaseStorage, user_id: int, chat_i
     )
 
 def schedule_night_cleaner(bot: Bot, storage: BaseStorage, user_id: int, chat_id: int, tz_str: str = "Europe/Moscow") -> None:
-    """FIX: BL-06 — Триггер 'date' вместо 'cron': cleaner срабатывает ОДИН раз
-    в ближайшие 03:00 по таймзоне юзера, а не каждую ночь бесконечно.
-    
-    Проблема с 'cron': если FSM-стейт не очищен (ошибка, сетевой сбой),
-    cleaner срабатывал каждую ночь, потенциально дублируя записи.
-    С 'date' он сработает ровно один раз — если к тому моменту диалог ещё висит.
-    """
-    from zoneinfo import ZoneInfo
-    user_tz = ZoneInfo(tz_str)
+    """Одноразовый cleaner на ближайшие 03:00 в таймзоне юзера."""
+    from bot.utils import safe_tz
+    user_tz = safe_tz(tz_str)
     now_local = datetime.now(user_tz)
     
     # Вычисляем ближайшее 03:00 в таймзоне юзера
@@ -221,8 +192,7 @@ def schedule_night_cleaner(bot: Bot, storage: BaseStorage, user_id: int, chat_id
             'user_id': user_id,
             'chat_id': chat_id
         }
-        # jobstore не указан → default MemoryJobStore
-    )    
+    )
     
 def cancel_night_cleaner(user_id: int) -> None:
     try:
@@ -233,11 +203,10 @@ def cancel_night_cleaner(user_id: int) -> None:
 
 # ──────────────────────────────────────────────
 # Weekly Digest — persistent, RedisJobStore
-# Переживает рестарт. Bot через get_bot().
 # ──────────────────────────────────────────────
 
 async def _process_single_user_digest(bot: Bot, user_id: int, tz_str: str) -> None:
-    """Хелпер: генерит дайджест для одного юзера (быстрая сессия БД)."""
+    """Генерация дайджеста для одного юзера (собственная DB-сессия)."""
     async with async_session() as session:
         entries = await get_last_week_entries(session, user_id, tz_str=tz_str)
         
@@ -250,7 +219,7 @@ async def _process_single_user_digest(bot: Bot, user_id: int, tz_str: str) -> No
 
 
 async def run_global_weekly_digest() -> None:
-    """Фабрика дайджестов: берет всех юзеров, бьет по 10 человек, делает паузы."""
+    """Рассылка дайджестов: фильтрация по дню/часу, батчинг по 10 с паузами."""
     logger.info("Фабрика дайджестов запущена")
     bot = get_bot()
     
@@ -261,27 +230,28 @@ async def run_global_weekly_digest() -> None:
     for user in users:
         try:
             now_local = datetime.now(ZoneInfo(user.timezone))
-            # Проверяем совпадение дня и часа
             if now_local.weekday() == user.digest_day and now_local.hour == user.digest_time:
                 target_users.append(user)
         except Exception as e:
-            logger.error(f"Скипаем юзера {user.telegram_id}, ошибка таймзоны: {e}")
+            logger.error("Скипаем юзера {}, ошибка таймзоны: {}", user.telegram_id, e)
     
     batch_size = 10
     for i in range(0, len(target_users), batch_size):
         batch = target_users[i:i + batch_size]
-        logger.info("Обработка пачки #{}, юзеров: {}", i // batch_size + 1, len(batch))
+        logger.info("Пачка #{}, юзеров: {}", i // batch_size + 1, len(batch))
         
-        for user in batch:
-            await _process_single_user_digest(bot, user.telegram_id, user.timezone)
+        await asyncio.gather(*(
+            _process_single_user_digest(bot, u.telegram_id, u.timezone)
+            for u in batch
+        ), return_exceptions=True)
             
-        # Пауза 65 сек перед следующей пачкой (лимит Гугла 15 RPM)
+        # Пауза 65 сек перед следующей пачкой (лимит Gemini 15 RPM)
         if i + batch_size < len(target_users):
             await asyncio.sleep(65)
 
 
 def schedule_global_weekly_digest() -> None:
-    """Регистрирует ОДНУ общую задачу на всех."""
+    """Регистрация ежечасной проверки дайджестов (persistent, Redis)."""
     scheduler.add_job(
         func=run_global_weekly_digest,
         trigger='cron',

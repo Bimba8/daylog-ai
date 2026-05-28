@@ -28,35 +28,48 @@ STARS_TEXT = (
     "Оплата в пару кликов прямо внутри мессенджера. Выбери комфортную сумму ниже 👇"
 )
 
+_HELP_TEXT = (
+    "🧠 <b>Как работает DayLog AI?</b>\n\n"
+    "Я — твой умный личный дневник. Больше никаких душных таблиц и оценок настроения от 1 до 10.\n\n"
+    "Просто рассказывай мне, как прошел твой день, обычным текстом. А нейросеть сама проанализирует его и вытянет метрики: <i>настроение, энергию, стресс и продуктивность</i>.\n\n"
+    "🎮 <b>Твой пульт управления:</b>\n"
+    "• <b>Записать день</b> — написать отчет (только 1 раз в сутки)\n"
+    "• <b>Мой дневник</b> — полистать прошлые записи\n"
+    "• <b>Статистика</b> — посмотреть свои средние метрики\n"
+    "• <b>Настройки</b> — поменять время напоминаний или таймзону\n\n"
+    "<code>💡 Лайфхак: Чем больше деталей в тексте, тем точнее ИИ оценит твое состояние.</code>\n\n"
+    "<i>Нашел баг или есть крутая идея? Пиши разработчику!</i>"
+)
+
+
+def _get_help_kb() -> InlineKeyboardMarkup:
+    """Клавиатура для help-страницы с кнопками обратной связи и доната."""
+    raw_text = "Здарова! Есть фидбек по DayLog AI: "
+    encoded_text = quote(raw_text)
+    dev_url = f"tg:resolve?domain=bimba_alpaca&text={encoded_text}"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💬 Написать разработчику", url=dev_url)],
+        [InlineKeyboardButton(text="⭐️ Поддержать проект", callback_data="open_main_donate")]
+    ])
+
+
 @router.message(F.text == "❤️ Поддержать проект")
 async def show_donate_menu(message: types.Message):
-    await message.answer(
-        text=MAIN_DONATE_TEXT,
-        reply_markup=get_donate_kb()
-    )
+    await message.answer(text=MAIN_DONATE_TEXT, reply_markup=get_donate_kb())
     
 @router.callback_query(F.data == "donate_crypto")
 async def show_crypto_donate(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        text=CRYPTO_TEXT,
-        reply_markup=get_donate_back_kb()
-    )
+    await callback.message.edit_text(text=CRYPTO_TEXT, reply_markup=get_donate_back_kb())
     await callback.answer()
     
 @router.callback_query(F.data == "donate_back")
 async def back_to_donate_menu(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        text=MAIN_DONATE_TEXT,
-        reply_markup=get_donate_kb()
-    )
+    await callback.message.edit_text(text=MAIN_DONATE_TEXT, reply_markup=get_donate_kb())
     await callback.answer()
 
 @router.callback_query(F.data == "donate_stars")
 async def show_stars_donate(callback: types.CallbackQuery):
-    await callback.message.edit_text(
-        text=STARS_TEXT,
-        reply_markup=get_stars_kb()
-    )
+    await callback.message.edit_text(text=STARS_TEXT, reply_markup=get_stars_kb())
     await callback.answer()
 
 @router.callback_query(F.data.startswith("stars_"))
@@ -74,11 +87,11 @@ async def send_stars_invoice(callback: types.CallbackQuery):
     await callback.answer()
     
 @router.pre_checkout_query()
-async def process_pre_checkout(pre_checkout_query: types.PreCheckoutQuery):       # stars
+async def process_pre_checkout(pre_checkout_query: types.PreCheckoutQuery):
     await pre_checkout_query.answer(ok=True)
     
 @router.message(F.successful_payment)
-async def successful_payment(message: types.Message):                              # stars
+async def successful_payment(message: types.Message):
     await message.answer(
         "🎉 <b>Оплата прошла успешно!</b>\n\n"
         "Звезды получены. Огромное спасибо за поддержку DayLog, крепко обнял! 🫂"
@@ -87,77 +100,14 @@ async def successful_payment(message: types.Message):                           
 @router.message(Command("help"))
 @router.message(F.text == "❓ Помощь")
 async def show_help(message: types.Message):
-    help_text = (
-        "🧠 <b>Как работает DayLog AI?</b>\n\n"
-        "Я — твой умный личный дневник. Больше никаких душных таблиц и оценок настроения от 1 до 10.\n\n"
-        "Просто рассказывай мне, как прошел твой день, обычным текстом. А нейросеть сама проанализирует его и вытянет метрики: <i>настроение, энергию, стресс и продуктивность</i>.\n\n"
-        "🎮 <b>Твой пульт управления:</b>\n"
-        "• <b>Записать день</b> — написать отчет (только 1 раз в сутки)\n"
-        "• <b>Мой дневник</b> — полистать прошлые записи\n"
-        "• <b>Статистика</b> — посмотреть свои средние метрики\n"
-        "• <b>Настройки</b> — поменять время напоминаний или таймзону\n\n"
-        "<code>💡 Лайфхак: Чем больше деталей в тексте, тем точнее ИИ оценит твое состояние.</code>\n\n"
-        "<i>Нашел баг или есть крутая идея? Пиши разработчику!</i>"
-    )
-    
-    raw_text = "Здарова! Есть фидбек по DayLog AI: "
-    encoded_text = quote(raw_text)
-    dev_url = f"tg:resolve?domain=bimba_alpaca&text={encoded_text}"
-    
-    help_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text="💬 Написать разработчику", 
-                url=dev_url
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="⭐️ Поддержать проект", 
-                callback_data="open_main_donate" 
-            )
-        ]
-    ])
-    
-    await message.answer(
-        text=help_text, 
-        reply_markup=help_kb
-    )
-    
-# FIX: CQ-03 — Безопасная отправка help из callback.
-# Раньше мы вызывали show_help(callback.message), но callback.message может быть
-# InaccessibleMessage (если сообщение слишком старое), что приведёт к AttributeError.
-# Решение: отправляем контент напрямую через callback.message.answer(),
-# который работает корректно даже с InaccessibleMessage.
+    await message.answer(text=_HELP_TEXT, reply_markup=_get_help_kb())
+
+# Отправляем help новым сообщением, а не edit — безопасно для старых callback'ов.
 @router.callback_query(F.data == "open_help_menu")
 async def process_settings_help_btn(callback: types.CallbackQuery):
     await callback.answer()
-    
-    raw_text = "Здарова! Есть фидбек по DayLog AI: "
-    encoded_text = quote(raw_text)
-    dev_url = f"tg:resolve?domain=bimba_alpaca&text={encoded_text}"
-    
-    help_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💬 Написать разработчику", url=dev_url)],
-        [InlineKeyboardButton(text="⭐️ Поддержать проект", callback_data="open_main_donate")]
-    ])
-    
-    help_text = (
-        "🧠 <b>Как работает DayLog AI?</b>\n\n"
-        "Я — твой умный личный дневник. Больше никаких душных таблиц и оценок настроения от 1 до 10.\n\n"
-        "Просто рассказывай мне, как прошел твой день, обычным текстом. А нейросеть сама проанализирует его и вытянет метрики: <i>настроение, энергию, стресс и продуктивность</i>.\n\n"
-        "🎮 <b>Твой пульт управления:</b>\n"
-        "• <b>Записать день</b> — написать отчет (только 1 раз в сутки)\n"
-        "• <b>Мой дневник</b> — полистать прошлые записи\n"
-        "• <b>Статистика</b> — посмотреть свои средние метрики\n"
-        "• <b>Настройки</b> — поменять время напоминаний или таймзону\n\n"
-        "<code>💡 Лайфхак: Чем больше деталей в тексте, тем точнее ИИ оценит твое состояние.</code>\n\n"
-        "<i>Нашел баг или есть крутая идея? Пиши разработчику!</i>"
-    )
-    
-    await callback.message.answer(text=help_text, reply_markup=help_kb)
+    await callback.message.answer(text=_HELP_TEXT, reply_markup=_get_help_kb())
 
-# FIX: CQ-03 — Аналогичная защита для donate callback.
 @router.callback_query(F.data == "open_main_donate")
 async def process_help_to_donate(callback: types.CallbackQuery):
     await callback.answer()

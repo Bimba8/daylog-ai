@@ -43,8 +43,8 @@ def get_settings_menu_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text="🌍 Часовой пояс", callback_data="set_tz"))
     builder.add(InlineKeyboardButton(text="⏰ Время напоминания", callback_data="set_time"))
-    builder.add(InlineKeyboardButton(text="❓ Помощь", callback_data="open_help_menu"))
     builder.add(InlineKeyboardButton(text="📰 Настройки дайджеста", callback_data="digest_menu"))
+    builder.add(InlineKeyboardButton(text="❓ Помощь", callback_data="open_help_menu"))
     builder.adjust(1)
     return builder.as_markup()
 
@@ -69,8 +69,7 @@ def get_cancel_kb() -> ReplyKeyboardMarkup:
         resize_keyboard=True
     )
 
-# FIX: BL-07 — Инлайн-кнопка «Завершить запись» вместо ненадёжного стоп-слова «пока».
-# Юзер видит её под каждым ответом AI в диалоге и может нажать в любой момент.
+# Инлайн-кнопка завершения записи, отображается под каждым ответом AI.
 def get_finish_diary_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text="✅ Завершить запись", callback_data="finish_diary"))

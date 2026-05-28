@@ -5,30 +5,27 @@ from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.queries import get_user_entries, get_entry_count, get_or_create_user
 from bot.keyboards.main_kb import get_report_kb
+from bot.utils import safe_tz
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 logger = logger.bind(module="HANDLER")
 
 router = Router()
 
-def calculate_stats(entries: list, total_count: int, tz_str: str = "UTC") -> dict | None:
-    """FIX: BL-05 — Streak считается в таймзоне юзера, а не сервера.
+def calculate_stats(metric_entries: list, streak_entries: list, total_count: int, tz_str: str = "UTC") -> dict | None:
+    """Расчёт статистики: средние метрики (по metric_entries) и стрик (по streak_entries).
     
-    Проблема: datetime.now().date() возвращало серверную дату, а entry.created_at.date()
-    — UTC-дату. Для юзера в UTC+5 запись в 23:00 локального (18:00 UTC) имела бы
-    UTC-дату «сегодня», но если юзер проверяет статистику в 01:00 следующего дня по серверу,
-    streak сломается.
-    
-    Решение: конвертируем и «сейчас», и created_at записей в таймзону юзера.
+    Стрик считается в таймзоне юзера, а не сервера.
     """
-    if not entries:
+    if not metric_entries:
         return None
     
-    # Расчет средних за последние записи (уже ограничены 7 штуками из БД)
+    # Средние за последние записи (ограничены 7 штуками)
     sums = {"mood": 0, "energy": 0, "stress": 0, "productivity": 0}
     count_with_metrics = 0
     
-    for entry in entries:
+    for entry in metric_entries:
         if entry.ai_metrics:
             try:
                 data = json.loads(entry.ai_metrics)
@@ -42,25 +39,22 @@ def calculate_stats(entries: list, total_count: int, tz_str: str = "UTC") -> dic
         for metric in sums:
             sums[metric] = round(sums[metric] / count_with_metrics, 1)
     
-    # FIX: BL-05 — Стрик: конвертируем все даты в таймзону юзера перед сравнением.
-    # created_at хранится в БД как naive UTC — добавляем tzinfo=UTC,
-    # затем переводим в локальное время юзера и берём .date().
-    from zoneinfo import ZoneInfo
-    user_tz = ZoneInfo(tz_str)
+    # Стрик: конвертируем все даты в таймзону юзера перед сравнением.
+    # created_at хранится как naive UTC — добавляем tzinfo=UTC, переводим в локальное.
+    user_tz = safe_tz(tz_str)
     utc_tz = ZoneInfo("UTC")
     
     streak = 0
     target_date = datetime.now(user_tz).date()
     
-    for entry in entries:
-        # created_at — naive datetime в UTC, приводим к aware и конвертируем
+    for entry in streak_entries:
         entry_date = entry.created_at.replace(tzinfo=utc_tz).astimezone(user_tz).date()
         
         if entry_date == target_date:
             streak += 1
             target_date -= timedelta(days=1)
         elif entry_date == target_date - timedelta(days=1) and streak == 0:
-            # Если юзер ещё не писал сегодня, но вчерашняя запись есть — стрик от неё
+            # Юзер ещё не писал сегодня, но вчерашняя запись есть — стрик от неё
             streak = 1
             target_date = entry_date - timedelta(days=1)
         elif entry_date < target_date:
@@ -75,14 +69,16 @@ def calculate_stats(entries: list, total_count: int, tz_str: str = "UTC") -> dic
 @router.message(Command("stats"))
 @router.message(F.text == "📊 Статистика")
 async def show_stats(message: types.Message, session: AsyncSession):
-    # FIX: BL-05 — Загружаем юзера для его таймзоны (нужна для корректного стрика)
+    """Показать статистику юзера: средние метрики и стрик."""
     user, _ = await get_or_create_user(session, message.from_user.id)
     
-    # Загружаем только последние 7 записей (для средних и стрика) + общий count
-    entries = await get_user_entries(session, message.from_user.id, order="desc", limit=7)
+    # Последние 7 записей для средних метрик
+    metric_entries = await get_user_entries(session, message.from_user.id, order="desc", limit=7)
+    # До 365 записей для стрика (без лимита — не нужно загружать все 1000+)
+    streak_entries = await get_user_entries(session, message.from_user.id, order="desc", limit=365)
     total_count = await get_entry_count(session, message.from_user.id)
     
-    if not entries:
+    if not metric_entries:
         await message.answer(
             text=(
                 "📊 <b>Статистика пока пуста</b>\n\n"
@@ -92,7 +88,7 @@ async def show_stats(message: types.Message, session: AsyncSession):
         )
         return
     
-    stats = calculate_stats(entries, total_count, tz_str=user.timezone)
+    stats = calculate_stats(metric_entries, streak_entries, total_count, tz_str=user.timezone)
     avg = stats['averages']
     
     response_text = (

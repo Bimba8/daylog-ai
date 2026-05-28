@@ -1,5 +1,5 @@
 from datetime import datetime
-from bot.utils import validate_time  # FIX: CQ-01 — DRY: общая утилита валидации времени
+from bot.utils import validate_time
 from aiogram import types, Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart, Command
@@ -16,9 +16,7 @@ router = Router()
 
 @router.message(CommandStart())
 async def handle_start(message: types.Message, state: FSMContext, session: AsyncSession):
-    # FIX: BL-01 + BL-02 — Сбрасываем FSM при /start, чтобы юзер не застрял в старом состоянии.
-    # Без этого: юзер в середине DiaryState нажимает /start → видит приветствие,
-    # но FSM остаётся в DiaryState → следующее сообщение уйдёт в process_answer вместо ожидаемого.
+    # Сброс FSM, чтобы /start всегда начинал с чистого состояния
     await state.clear()
     user, is_new = await get_or_create_user(
         session=session,
@@ -51,9 +49,9 @@ async def handle_start(message: types.Message, state: FSMContext, session: Async
     
 @router.callback_query(F.data == "start_onboarding")
 async def start_onboarding(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(OnboardingState.waiting_for_tz) # Переводим в ожидание часового пояса
+    await state.set_state(OnboardingState.waiting_for_tz)
     await callback.message.delete()
-    # Меняем приветственное сообщение на вопрос про город
+
     await callback.message.answer(
         text=(
             "🌍 <b>Где ты находишься?</b>\n\n"
@@ -83,7 +81,7 @@ async def onboarding_tz_selected(callback: types.CallbackQuery, state: FSMContex
     
 @router.message(OnboardingState.waiting_for_time)
 async def onboarding_time_selected(message: types.Message, state: FSMContext, session: AsyncSession):
-    # FIX: CQ-01 — Используем общую утилиту вместо дублированного try/except
+    # Валидация формата ЧЧ:ММ
     new_time = validate_time(message.text)
     if new_time is None:
         await message.answer(
@@ -115,9 +113,7 @@ async def onboarding_time_selected(message: types.Message, state: FSMContext, se
     )
     
 
-# FIX: BL-01 — Обработка не-текстовых сообщений во время онбординга.
-# Если юзер отправит стикер/фото вместо времени — хендлер onboarding_time_selected
-# не поймает этот update (он работает только с text), и FSM зависнет.
+# Фильтр не-текстовых сообщений во время ожидания ввода времени.
 @router.message(OnboardingState.waiting_for_time, ~F.text)
 async def onboarding_non_text(message: types.Message):
     await message.answer(
@@ -147,10 +143,9 @@ async def show_settings_menu(event: types.Message | types.CallbackQuery):
 
 @router.callback_query(F.data == "set_tz")
 async def start_tz_selection(callback: types.CallbackQuery, state: FSMContext):
-    # Включаем «режим ожидания» выбора города
+    # Включаем режим ожидания выбора таймзоны
     await state.set_state(SettingState.waiting_for_tz)
     
-    # Редактируем старое сообщение: меняем текст и вешаем новую клавиатуру (с городами)
     await callback.message.edit_text(
         text="🌍 <b>Часовой пояс</b>\n\nГде ты сейчас находишься?",
         reply_markup=get_timezone_kb()
@@ -160,16 +155,12 @@ async def start_tz_selection(callback: types.CallbackQuery, state: FSMContext):
     
 @router.callback_query(SettingState.waiting_for_tz, F.data.startswith("tz_"))
 async def tz_selection_final(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
-    # 1. Вытаскиваем название пояса из callback_data
-    # Мы отрезаем первые 3 символа ("tz_"), остается только "Europe/Moscow" и т.д.
     selected_tz = callback.data[3:]
     
     friendly_name = next((name for name, tz in ru_timezones.items() if tz == selected_tz), selected_tz)
     
-    # 2. Убираем часики (обязательно!)
     await callback.answer(f"Выбран пояс: {friendly_name}")
     
-    # 3. Сохраняем в базу данных
     user = await update_user_timezone(session, callback.from_user.id, selected_tz)
     schedule_daily_reminder(
         bot=callback.bot, 
@@ -179,16 +170,15 @@ async def tz_selection_final(callback: types.CallbackQuery, state: FSMContext, s
     )
     
     await callback.message.edit_text(
-        text=f"🌍 <b>Часовой пояс обновлен!</b>\n\nТеперь ты я работаю по времени: <b>{friendly_name}</b>."
+        text=f"🌍 <b>Часовой пояс обновлен!</b>\n\nТеперь я работаю по времени: <b>{friendly_name}</b>."
     )
     await state.clear()
     
 @router.callback_query(F.data == "set_time")
 async def start_time_selection(callback: types.CallbackQuery, state: FSMContext):
-    # Включаем «режим ожидания» ввода цифр
+    # Включаем режим ожидания ввода времени
     await state.set_state(SettingState.waiting_for_time)
     
-    # Редактируем сообщение: просим написать время
     await callback.message.edit_text(
         text=(
             "🕒 <b>Время напоминаний</b>\n\n"
@@ -201,7 +191,7 @@ async def start_time_selection(callback: types.CallbackQuery, state: FSMContext)
     
 @router.message(SettingState.waiting_for_time)
 async def process_setting_time(message: types.Message, state: FSMContext, session: AsyncSession):
-    # FIX: CQ-01 — Используем общую утилиту вместо дублированного try/except
+    # Валидация формата ЧЧ:ММ
     new_time = validate_time(message.text)
     if new_time is None:
         await message.answer(
@@ -264,24 +254,40 @@ async def show_digest_time_selection(callback: types.CallbackQuery, session: Asy
 
 @router.callback_query(F.data.startswith("dday_"))
 async def process_digest_day(callback: types.CallbackQuery, session: AsyncSession):
-    day_idx = int(callback.data.split("_")[1])
+    """Обработка выбора дня дайджеста с валидацией callback_data."""
+    try:
+        day_idx = int(callback.data.split("_")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Некорректные данные")
+        return
+    if day_idx not in range(7):
+        await callback.answer("Некорректный день")
+        return
+    
     user = await update_user_digest_day(session, callback.from_user.id, day_idx)
     new_kb = get_digest_day_kb(selected_day=day_idx)
     try:
         await callback.message.edit_reply_markup(reply_markup=new_kb)
     except TelegramBadRequest:
-        # Игнорируем, если клавиатура не изменилась
         pass
     await callback.answer()
     
 @router.callback_query(F.data.startswith("dtime_"))
 async def process_digest_time(callback: types.CallbackQuery, session: AsyncSession):
-    time_idx = int(callback.data.split("_")[1])
+    """Обработка выбора времени дайджеста с валидацией callback_data."""
+    try:
+        time_idx = int(callback.data.split("_")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Некорректные данные")
+        return
+    if time_idx not in range(0, 24, 2):
+        await callback.answer("Некорректное время")
+        return
+    
     user = await update_user_digest_time(session, callback.from_user.id, time_idx)
     new_kb = get_digest_time_kb(selected_time=time_idx)
     try:
         await callback.message.edit_reply_markup(reply_markup=new_kb)
     except TelegramBadRequest:
-        # Игнорируем, если клавиатура не изменилась
         pass
     await callback.answer()
