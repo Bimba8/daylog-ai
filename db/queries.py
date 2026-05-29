@@ -109,7 +109,7 @@ async def check_today_entry(session: AsyncSession, tg_id: int, tz_str: str = "UT
         .limit(1)
     )
     result = await session.execute(stmt)
-    return result.scalar_or_none() is not None
+    return result.scalar_one_or_none() is not None  # <--- Добавил _one_
 
 
 async def update_user_timezone(session: AsyncSession, tg_id: int, new_tz: str) -> User:
