@@ -276,6 +276,15 @@ async def report_from_reminder(callback: types.CallbackQuery, state: FSMContext,
     """Начало записи через инлайн-кнопку (из напоминалки или меню)."""
     user, _ = await get_or_create_user(session, callback.from_user.id)
     
+    already_wrote_today = await check_today_entry(session, callback.from_user.id, user.timezone)
+    if already_wrote_today:
+        await callback.message.answer(
+            "🛡 <b>Отчет за сегодня уже в базе</b>\n\n"
+            "На сегодня всё. Отдыхай, а новый день обсудим завтра!"
+        )
+        await callback.answer()
+        return
+    
     await state.set_state(DiaryState.waiting_for_story)
     await state.update_data(user_tz=user.timezone)
     await callback.message.delete() 
