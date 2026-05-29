@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
 from sqlalchemy.exc import IntegrityError
@@ -48,7 +48,11 @@ async def get_all_users(session: AsyncSession) -> list[User]:
 async def add_diary_entry(session: AsyncSession, tg_id: int, user_text: str) -> DiaryEntry:
     """Создать запись дневника. flush() — для получения ID, коммит в middleware."""
     user, _ = await get_or_create_user(session, tg_id)
-    new_entry = DiaryEntry(user_id=user.id, user_text=user_text)
+    new_entry = DiaryEntry(
+        user_id=user.id, 
+        user_text=user_text,
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None)  # Бронебойный UTC
+    )
     session.add(new_entry)
     await session.flush()
     return new_entry
@@ -102,9 +106,10 @@ async def check_today_entry(session: AsyncSession, tg_id: int, tz_str: str = "UT
             DiaryEntry.created_at >= day_start_utc,
             DiaryEntry.created_at < day_end_utc,
         )
+        .limit(1)
     )
     result = await session.execute(stmt)
-    return result.scalar_one_or_none() is not None
+    return result.scalar_or_none() is not None
 
 
 async def update_user_timezone(session: AsyncSession, tg_id: int, new_tz: str) -> User:
