@@ -235,19 +235,14 @@ async def run_global_weekly_digest() -> None:
         except Exception as e:
             logger.error("Скипаем юзера {}, ошибка таймзоны: {}", user.telegram_id, e)
     
-    batch_size = 10
-    for i in range(0, len(target_users), batch_size):
-        batch = target_users[i:i + batch_size]
-        logger.info("Пачка #{}, юзеров: {}", i // batch_size + 1, len(batch))
-        
-        await asyncio.gather(*(
-            _process_single_user_digest(bot, u.telegram_id, u.timezone)
-            for u in batch
-        ), return_exceptions=True)
+    for user in target_users:
+        try:
+            await _process_single_user_digest(bot, user.telegram_id, user.timezone)
+        except Exception as e:
+            logger.error("Дайджест не ушел {}: {}", user.telegram_id, e)
             
-        # Пауза 65 сек перед следующей пачкой (лимит Gemini 15 RPM)
-        if i + batch_size < len(target_users):
-            await asyncio.sleep(65)
+        # Лимит Gemini 15 RPM -> строго 1 запрос раз в 4.5 секунды
+        await asyncio.sleep(4.5)
 
 
 def schedule_global_weekly_digest() -> None:
