@@ -4,7 +4,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from bot.handlers.states import DiaryState
 from db.queries import add_diary_entry, check_today_entry, get_or_create_user
-from bot.services.ai import get_ai_response
+from bot.services.ai import get_ai_response, SafetyBlockError
 from bot.services.scheduler import schedule_nudge, cancel_nudge, schedule_night_cleaner, cancel_night_cleaner
 from bot.services.saver import finalize_diary_entry
 from bot.keyboards.main_kb import get_cancel_kb, get_main_kb, get_finish_diary_kb
@@ -64,7 +64,27 @@ async def process_story(message: types.Message, state: FSMContext, session: Asyn
     await state.update_data(ai_processing=True)
     
     processing_msg = await message.answer("🧠 <i>Анализирую твой день...</i>")
-    ai_response = await get_ai_response(message.text)
+    
+    try:
+        ai_response = await get_ai_response(message.text)
+    except SafetyBlockError:
+        await state.update_data(ai_processing=False)
+        await safe_delete(processing_msg)
+        
+        await finalize_diary_entry(
+            bot=message.bot, 
+            chat_id=message.chat.id, 
+            user_id=message.from_user.id, 
+            text=message.text, 
+            state=state, 
+            session=session
+        )
+        await message.answer(
+            "🛡 <b>Твой день сохранен.</b>\n\nИз-за жестких ограничений безопасности ИИ (цензура платформы) я не смог прокомментировать этот текст, но всё надежно записал в базу.",
+            reply_markup=get_main_kb()
+        )
+        return
+    
     await state.update_data(ai_processing=False)
     
     if not ai_response:
@@ -177,7 +197,27 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
     else:
         await state.update_data(ai_processing=True)
         processing_msg = await message.answer("🧠 <i>Анализирую твой ответ...</i>")
-        ai_response = await get_ai_response(new_story)
+        
+        try:
+            ai_response = await get_ai_response(new_story)
+        except SafetyBlockError:
+            await state.update_data(ai_processing=False)
+            await safe_delete(processing_msg)
+            
+            await finalize_diary_entry(
+                bot=message.bot, 
+                chat_id=message.chat.id, 
+                user_id=message.from_user.id, 
+                text=new_story, 
+                state=state, 
+                session=session
+            )
+            await message.answer(
+                "🛡 <b>Твой день сохранен.</b>\n\nИз-за жестких ограничений безопасности ИИ (цензура платформы) я не смог прокомментировать этот текст, но всё надежно записал в базу.",
+                reply_markup=get_main_kb()
+            )
+            return
+        
         await state.update_data(ai_processing=False)
         
         if not ai_response:

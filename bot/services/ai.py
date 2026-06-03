@@ -9,6 +9,9 @@ logger = logger.bind(module="AI")
 
 _METRIC_KEYS = ("mood", "energy", "stress", "productivity")
 
+class SafetyBlockError(Exception):
+    pass
+
 def _validate_metrics(data: dict) -> dict | None:
     """Валидация и нормализация AI-метрик. Clamp значения в диапазон 1-5."""
     try:
@@ -133,7 +136,15 @@ async def get_ai_response(user_text: str) -> str | None:
             
             try:
                 response = await ai_router._call_google(GOOGLE_MODEL, messages)
+                
+                if "candidates" not in response and "promptFeedback" in response:
+                    logger.warning("Сработал Safety Block от Google")
+                    raise SafetyBlockError("Safety Blocked")
+                
                 return response['candidates'][0]['content']['parts'][0]['text']
+            
+            except SafetyBlockError:
+                raise
             except Exception as e3:
                 logger.error("Все AI-провайдеры лежат: {}", e3)
                 return None
@@ -210,8 +221,39 @@ async def generate_weekly_digest(entries: list) -> str | None:
     ]
     
     try:
-        response = await ai_router._call_google("gemini-2.5-flash", messages)
-        return response['candidates'][0]['content']['parts'][0]['text']
+        # 1. Дергаем Gemini с флагом is_json=True
+        response = await ai_router._call_google("gemini-2.5-flash", messages, is_json=True)
+        raw_text = response['candidates'][0]['content']['parts'][0]['text']
+        
+        # 2. Парсим ответ
+        data = json.loads(raw_text)
+        
+        # 3. Собираем списки в строки
+        highs_list = "\n".join([f"• {item}" for item in data.get("highs", [])])
+        lows_list = "\n".join([f"• {item}" for item in data.get("lows", [])])
+        
+        # 4. Верстаем итоговый HTML
+        final_html = f"""🗓 <b>Итоги твоей недели</b>
+
+💭 <i>«{data.get('quote', 'Без цитаты')}»</i>
+
+✨ <b>Вайб и фокус</b>
+{data.get('vibe', 'Нет данных')}
+
+⚡️ <b>Что давало ресурс:</b>
+{highs_list if highs_list else "• Ничего особенного"}
+
+🪫 <b>Скрытые утечки:</b>
+{lows_list if lows_list else "• Всё ровно"}
+
+💡 <b>Мысль на подумать:</b>
+{data.get('insight', '')}"""
+
+        return final_html
+
+    except json.JSONDecodeError:
+        logger.error("Gemini отдал кривой JSON для дайджеста: {}", raw_text)
+        return None
     except Exception as e:
         logger.error("Ошибка генерации дайджеста: {}", e)
         return None
