@@ -60,6 +60,19 @@ services:
     ports:
       - "8888:8080"
 
+  metabase:
+      image: metabase/metabase:latest
+      container_name: daylog_metabase
+      restart: always
+      ports:
+        - "3000:3000" # Открываем порт для веб-интерфейса
+      volumes:
+        - metabase-data:/metabase.db
+      environment:
+        - MB_DB_FILE=/metabase.db/metabase.db
+      depends_on:
+        - db # Замени на название твоего сервиса с PostgreSQL, если оно другое
+
 networks:
   backend:
     driver: bridge
@@ -69,3 +82,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  metabase-data:

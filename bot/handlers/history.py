@@ -3,20 +3,18 @@ from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.queries import get_latest_diary_entry, get_adjacent_entry
 from bot.keyboards.main_kb import get_history_kb, get_report_kb
+from bot.lexicon.ru import LEXICON_RU
 
 router = Router()
 
 @router.message(Command("history"))
-@router.message(F.text == "📚 Мой дневник")
+@router.message(F.text == LEXICON_RU['kb_my_diary'])
 async def show_history_start(message: types.Message, session: AsyncSession):
     latest_entry = await get_latest_diary_entry(session, message.from_user.id)
     
     if not latest_entry:
         await message.answer(
-            text=(
-                "📭 <b>Дневник пока пуст</b>\n\n"
-                "Здесь будут храниться твои записи. Нажми «📝 Записать день», чтобы сделать первую."
-            ),
+            text=LEXICON_RU['hist_empty'],
             reply_markup=get_report_kb()
         )
         return
@@ -26,7 +24,7 @@ async def show_history_start(message: types.Message, session: AsyncSession):
     has_next = False
     
     date_str = latest_entry.created_at.strftime("%d.%m.%Y")
-    text = f"📅 <b>Запись от {date_str}</b>\n\n{latest_entry.user_text}"
+    text = LEXICON_RU['hist_entry'].format(date=date_str, text=latest_entry.user_text)
     
     await message.answer(
         text=text,
@@ -38,20 +36,20 @@ async def process_history_pagination(callback: types.CallbackQuery, session: Asy
     """Пагинация записей дневника с валидацией callback_data."""
     parts = callback.data.split("_")
     if len(parts) < 3:
-        await callback.answer("Некорректные данные")
+        await callback.answer(LEXICON_RU['hist_invalid_data'])
         return
     
     action = parts[1]
     try:
         current_id = int(parts[2])
     except ValueError:
-        await callback.answer("Некорректные данные")
+        await callback.answer(LEXICON_RU['hist_invalid_data'])
         return
     
     target_entry = await get_adjacent_entry(session, callback.from_user.id, current_id, action)
     
     if not target_entry:
-        await callback.answer("🛑 Дальше записей нет", show_alert=True)
+        await callback.answer(LEXICON_RU['hist_no_more'], show_alert=True)
         return
     
     # Проверяем соседей У НОВОЙ записи
@@ -59,7 +57,7 @@ async def process_history_pagination(callback: types.CallbackQuery, session: Asy
     next_entry = await get_adjacent_entry(session, callback.from_user.id, target_entry.id, "next")
     
     date_str = target_entry.created_at.strftime("%d.%m.%Y")
-    new_text = f"📅 <b>Запись от {date_str}</b>\n\n{target_entry.user_text}"
+    new_text = LEXICON_RU['hist_entry'].format(date=date_str, text=target_entry.user_text)
     
     await callback.message.edit_text(
         text=new_text,

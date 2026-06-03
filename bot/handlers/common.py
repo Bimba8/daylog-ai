@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.keyboards.main_kb import get_start_diary_inline_kb
 from db.queries import get_user, get_user_entries
 from bot.services.ai import generate_weekly_digest
+from bot.lexicon.ru import LEXICON_RU
 
 # Этот роутер регистрируется ПОСЛЕДНИМ в main.py.
 # Он ловит все сообщения без активного FSM-состояния,
@@ -16,10 +17,10 @@ async def force_digest_test(message: types.Message, session: AsyncSession):
     user = await get_user(session, message.from_user.id)
     
     if not user:
-        await message.answer("❌ Тебя нет в базе, напиши /start")
+        await message.answer(LEXICON_RU['common_no_user'])
         return
         
-    await message.answer("🔨 Собираю тестовый дайджест. Жди, Gemini думает...")
+    await message.answer(LEXICON_RU['common_digest_loading'])
     
     try:
         # МАГИЯ ЗДЕСЬ: берем тупо 7 последних записей за всё время
@@ -31,7 +32,7 @@ async def force_digest_test(message: types.Message, session: AsyncSession):
         )
         
         if len(entries) < 2:
-            await message.answer(f"⚠️ Для теста нужно минимум 2 записи. Найдено: {len(entries)}.")
+            await message.answer(LEXICON_RU['common_digest_min_entries'].format(count=len(entries)))
             return
             
         # Скармливаем их ИИ
@@ -40,25 +41,21 @@ async def force_digest_test(message: types.Message, session: AsyncSession):
         if digest_html:
             await message.answer(digest_html)
         else:
-            await message.answer("❌ ИИ ничего не вернул или отдал кривой JSON. Чекай логи в консоли.")
+            await message.answer(LEXICON_RU['common_digest_ai_empty'])
             
     except Exception as e:
-        await message.answer(f"❌ Критическая ошибка при генерации: {e}")
+        await message.answer(LEXICON_RU['common_digest_error'].format(error=e))
 
 @router.message(F.text, StateFilter(None))
 async def catch_stray_text(message: types.Message):
     await message.answer(
-        "👀 <b>Текст вижу, но я не в режиме записи</b>\n\n"
-        "Чтобы дневник сохранился:\n"
-        "• Нажми кнопку «📝 Записать день».\n"
-        "• Отправь или перешли мне этот текст еще раз.",
+        LEXICON_RU['common_stray_text'],
         reply_markup=get_start_diary_inline_kb()
     )
 
 @router.message(StateFilter(None))
 async def catch_stray_media(message: types.Message):
     await message.answer(
-        "🔤 <b>Я пока понимаю только текст</b>\n\n"
-        "Голосовые, фото и кружочки не пройдут. Нажми «📝 Записать день» и расскажи обо всем буквами.",
+        LEXICON_RU['common_stray_media'],
         reply_markup=get_start_diary_inline_kb()
     )

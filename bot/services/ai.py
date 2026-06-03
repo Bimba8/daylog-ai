@@ -3,6 +3,7 @@ import aiohttp
 from loguru import logger
 from config import config
 from tenacity import retry, wait_exponential_jitter, retry_if_exception_type, stop_after_attempt
+from langfuse import observe
 from bot.services.prompts import SYSTEM_PROMPT, METRICS_SYSTEM_PROMPT, DIGEST_SYSTEM_PROMPT
 
 logger = logger.bind(module="AI")
@@ -53,6 +54,7 @@ class AIRouter:
         retry=retry_if_exception_type(aiohttp.ClientResponseError),
         reraise=True,
     )
+    @observe(as_type="generation")
     async def _call_groq(self, model: str, messages: list[dict], is_json: bool = False) -> dict:
         """Запрос к Groq API (OpenAI-совместимый формат)."""
         url = "https://api.groq.com/openai/v1/chat/completions"
@@ -78,6 +80,7 @@ class AIRouter:
         retry=retry_if_exception_type(aiohttp.ClientResponseError),
         reraise=True,
     )
+    @observe(as_type="generation")
     async def _call_google(self, model: str, messages: list[dict], is_json: bool = False) -> dict:
         """Запрос к Google Gemini API. Ключ передаётся через заголовок, не через URL."""
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"

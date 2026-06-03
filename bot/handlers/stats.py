@@ -8,6 +8,7 @@ from bot.keyboards.main_kb import get_report_kb
 from bot.utils import safe_tz
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from bot.lexicon.ru import LEXICON_RU
 
 logger = logger.bind(module="HANDLER")
 
@@ -67,7 +68,7 @@ def calculate_stats(metric_entries: list, streak_entries: list, total_count: int
     }
     
 @router.message(Command("stats"))
-@router.message(F.text == "📊 Статистика")
+@router.message(F.text == LEXICON_RU['kb_stats'])
 async def show_stats(message: types.Message, session: AsyncSession):
     """Показать статистику юзера: средние метрики и стрик."""
     user, _ = await get_or_create_user(session, message.from_user.id)
@@ -80,10 +81,7 @@ async def show_stats(message: types.Message, session: AsyncSession):
     
     if not metric_entries:
         await message.answer(
-            text=(
-                "📊 <b>Статистика пока пуста</b>\n\n"
-                "Напиши первый отчет, чтобы ИИ начал собирать твои метрики."
-            ),
+            text=LEXICON_RU['stats_empty'],
             reply_markup=get_report_kb()
         )
         return
@@ -91,15 +89,13 @@ async def show_stats(message: types.Message, session: AsyncSession):
     stats = calculate_stats(metric_entries, streak_entries, total_count, tz_str=user.timezone)
     avg = stats['averages']
     
-    response_text = (
-        "📊 <b>Твоя статистика</b>\n\n"
-        f"🏆 Всего записей: <b>{stats['total_count']}</b>\n"
-        f"🔥 Текущий стрик: <b>{stats['streak']} дн.</b>\n\n"
-        "📈 <b>Среднее за неделю:</b>\n"
-        f"😌 Настроение: <b>{avg['mood']}</b>\n"
-        f"⚡️ Энергия: <b>{avg['energy']}</b>\n"
-        f"🧠 Продуктивность: <b>{avg['productivity']}</b>\n"
-        f"🌪 Стресс: <b>{avg['stress']}</b>"
+    response_text = LEXICON_RU['stats_report'].format(
+        total_count=stats['total_count'],
+        streak=stats['streak'],
+        mood=avg['mood'],
+        energy=avg['energy'],
+        productivity=avg['productivity'],
+        stress=avg['stress']
     )
 
     await message.answer(response_text)

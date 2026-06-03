@@ -10,6 +10,7 @@ from db.queries import get_or_create_user, update_user_timezone, update_user_tim
 from bot.keyboards.main_kb import get_main_kb, get_settings_menu_kb, get_timezone_kb, get_onboarding_start_kb, get_report_kb, ru_timezones, get_digest_day_kb, get_digest_time_kb, get_digest_settings_menu_kb
 from bot.handlers.states import SettingState, OnboardingState
 from bot.services.scheduler import schedule_daily_reminder
+from bot.lexicon.ru import LEXICON_RU
 
 
 router = Router()
@@ -26,24 +27,16 @@ async def handle_start(message: types.Message, state: FSMContext, session: Async
     
     photo = FSInputFile("assets/onboarding.png")
     
-    welcome_text = (
-        "🧠 <b>Привет! Я DayLog</b>\n\n"
-        "Твой умный личный дневник. Забудь про скучные трекеры — просто рассказывай мне, как прошел день, а я сделаю всё остальное:\n\n"
-        "• Разложу мысли по полочкам\n"
-        "• Вытяну метрики (настроение, стресс, энергия, продуктивность)\n"
-        "• Соберу красивую статистику\n\n"
-        "Готов навести порядок в голове? Настройка займет ровно 10 секунд!"
-    )
     if is_new:
         await message.answer_photo(
             photo=photo,
-            caption=welcome_text,
+            caption=LEXICON_RU['start_welcome'],
             reply_markup=get_onboarding_start_kb()
         )
     else:
         await message.answer_photo(
             photo=photo,
-            caption=welcome_text,
+            caption=LEXICON_RU['start_welcome'],
             reply_markup=get_report_kb()
         )
     
@@ -53,10 +46,7 @@ async def start_onboarding(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.delete()
 
     await callback.message.answer(
-        text=(
-            "🌍 <b>Где ты находишься?</b>\n\n"
-            "Выбери свой часовой пояс ниже. Это нужно, чтобы напоминалки приходили вовремя."
-        ),
+        text=LEXICON_RU['start_onboarding_tz'],
         reply_markup=get_timezone_kb()
     )
     await callback.answer()
@@ -71,11 +61,7 @@ async def onboarding_tz_selected(callback: types.CallbackQuery, state: FSMContex
     await state.set_state(OnboardingState.waiting_for_time)
     
     await callback.message.edit_text(
-        text=(
-            f"🌍 <b>Пояс: {friendly_name}</b>\n\n"
-            f"В какое время тебе удобно подводить итоги дня?\n"
-            f"Отправь время в формате <code>ЧЧ:ММ</code> (например, <code>21:00</code>)."
-        )
+        text=LEXICON_RU['start_onboarding_tz_done'].format(tz_name=friendly_name)
     )
     await callback.answer()
     
@@ -84,10 +70,7 @@ async def onboarding_time_selected(message: types.Message, state: FSMContext, se
     # Валидация формата ЧЧ:ММ
     new_time = validate_time(message.text)
     if new_time is None:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Напиши время цифрами в формате <code>ЧЧ:ММ</code> (от <code>00:00</code> до <code>23:59</code>)."
-        )
+        await message.answer(LEXICON_RU['start_invalid_time'])
         return
     
     user = await update_user_time(session, message.from_user.id, new_time)
@@ -100,15 +83,8 @@ async def onboarding_time_selected(message: types.Message, state: FSMContext, se
             
     await state.clear()
     
-    final_text = (
-        f"✅ <b>Всё готово!</b>\n\n"
-        f"Я буду приходить за отчетами каждый день ровно в <b>{new_time}</b>.\n\n"
-        f"<code>⚠️ Важно: Записать день можно только 1 раз. Постарайся уместить все мысли в одно сообщение.</code>\n\n"
-        f"Жми кнопку «📝 Записать день», чтобы сделать первую запись 👇"
-    )
-    
     await message.answer(
-        text=final_text, 
+        text=LEXICON_RU['start_onboarding_done'].format(time=new_time), 
         reply_markup=get_report_kb()
     )
     
@@ -116,23 +92,17 @@ async def onboarding_time_selected(message: types.Message, state: FSMContext, se
 # Фильтр не-текстовых сообщений во время ожидания ввода времени.
 @router.message(OnboardingState.waiting_for_time, ~F.text)
 async def onboarding_non_text(message: types.Message):
-    await message.answer(
-        "🔤 <b>Жду именно текст</b>\n\n"
-        "Отправь время в формате <code>ЧЧ:ММ</code> (например, <code>21:00</code>)."
-    )
+    await message.answer(LEXICON_RU['start_text_only_time'])
 
 @router.message(SettingState.waiting_for_time, ~F.text)
 async def setting_non_text(message: types.Message):
-    await message.answer(
-        "🔤 <b>Жду именно текст</b>\n\n"
-        "Отправь время в формате <code>ЧЧ:ММ</code> (например, <code>21:00</code>)."
-    )
+    await message.answer(LEXICON_RU['start_text_only_time'])
     
 
-@router.message(F.text == "⚙️ Настройки")
+@router.message(F.text == LEXICON_RU['kb_settings'])
 @router.callback_query(F.data == "settings_main")
 async def show_settings_menu(event: types.Message | types.CallbackQuery):
-    text = "⚙️ <b>Настройки</b>\n\nЧто будем менять?"
+    text = LEXICON_RU['start_settings_title']
     kb = get_settings_menu_kb()
     
     if isinstance(event, types.Message):
@@ -147,7 +117,7 @@ async def start_tz_selection(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(SettingState.waiting_for_tz)
     
     await callback.message.edit_text(
-        text="🌍 <b>Часовой пояс</b>\n\nГде ты сейчас находишься?",
+        text=LEXICON_RU['start_tz_select'],
         reply_markup=get_timezone_kb()
     )
     
@@ -159,7 +129,7 @@ async def tz_selection_final(callback: types.CallbackQuery, state: FSMContext, s
     
     friendly_name = next((name for name, tz in ru_timezones.items() if tz == selected_tz), selected_tz)
     
-    await callback.answer(f"Выбран пояс: {friendly_name}")
+    await callback.answer(LEXICON_RU['start_tz_selected_toast'].format(tz_name=friendly_name))
     
     user = await update_user_timezone(session, callback.from_user.id, selected_tz)
     schedule_daily_reminder(
@@ -170,7 +140,7 @@ async def tz_selection_final(callback: types.CallbackQuery, state: FSMContext, s
     )
     
     await callback.message.edit_text(
-        text=f"🌍 <b>Часовой пояс обновлен!</b>\n\nТеперь я работаю по времени: <b>{friendly_name}</b>."
+        text=LEXICON_RU['start_tz_updated'].format(tz_name=friendly_name)
     )
     await state.clear()
     
@@ -180,10 +150,7 @@ async def start_time_selection(callback: types.CallbackQuery, state: FSMContext)
     await state.set_state(SettingState.waiting_for_time)
     
     await callback.message.edit_text(
-        text=(
-            "🕒 <b>Время напоминаний</b>\n\n"
-            "Отправь желаемое время в формате <code>ЧЧ:ММ</code> (например, <code>21:00</code>)."
-        ),
+        text=LEXICON_RU['start_time_prompt'],
         reply_markup=None
     )
     
@@ -194,10 +161,7 @@ async def process_setting_time(message: types.Message, state: FSMContext, sessio
     # Валидация формата ЧЧ:ММ
     new_time = validate_time(message.text)
     if new_time is None:
-        await message.answer(
-            "❌ <b>Неверный формат</b>\n\n"
-            "Напиши время цифрами в формате <code>ЧЧ:ММ</code> (от <code>00:00</code> до <code>23:59</code>)."
-        )
+        await message.answer(LEXICON_RU['start_invalid_time'])
         return
     
     user = await update_user_time(session, message.from_user.id, new_time)
@@ -209,13 +173,12 @@ async def process_setting_time(message: types.Message, state: FSMContext, sessio
     )
             
     await message.answer(
-        f"🕒 <b>Время сохранено!</b>\n\n"
-        f"Буду приходить за отчетом каждый день ровно в <b>{new_time}</b>."
+        LEXICON_RU['start_time_saved'].format(time=new_time)
     )
     await state.clear()
     
 @router.message(Command("cancel"))
-@router.message(F.text == "Отмена")
+@router.message(F.text == LEXICON_RU['kb_cancel'])
 async def cancel_handler(message: types.Message, state: FSMContext):
     current_state = await state.get_state()
     
@@ -224,7 +187,7 @@ async def cancel_handler(message: types.Message, state: FSMContext):
     
     await state.clear()
     await message.answer(
-        text="🚫 <b>Действие отменено</b>",
+        text=LEXICON_RU['start_cancelled'],
         reply_markup=get_main_kb(),
     )
 
@@ -232,7 +195,7 @@ async def cancel_handler(message: types.Message, state: FSMContext):
 @router.callback_query(F.data == "settings_digest")
 async def show_digest_settings(callback: types.CallbackQuery):
     await callback.message.edit_text(
-        text="⚙️ Настройки дайджеста. Что будем менять?",
+        text=LEXICON_RU['start_digest_settings'],
         reply_markup=get_digest_settings_menu_kb()
     )
     
@@ -240,7 +203,7 @@ async def show_digest_settings(callback: types.CallbackQuery):
 async def show_digest_day_selection(callback: types.CallbackQuery, session: AsyncSession):
     user, _ = await get_or_create_user(session, callback.from_user.id)
     await callback.message.edit_text(
-        text="📅 Выбери день недели для получения дайджеста:",
+        text=LEXICON_RU['start_digest_day_select'],
         reply_markup=get_digest_day_kb(user.digest_day)
     )
 
@@ -248,7 +211,7 @@ async def show_digest_day_selection(callback: types.CallbackQuery, session: Asyn
 async def show_digest_time_selection(callback: types.CallbackQuery, session: AsyncSession):
     user, _ = await get_or_create_user(session, callback.from_user.id)
     await callback.message.edit_text(
-        text="🕒 Выбери время отправки дайджеста:",
+        text=LEXICON_RU['start_digest_time_select'],
         reply_markup=get_digest_time_kb(user.digest_time)
     )
 
@@ -258,10 +221,10 @@ async def process_digest_day(callback: types.CallbackQuery, session: AsyncSessio
     try:
         day_idx = int(callback.data.split("_")[1])
     except (ValueError, IndexError):
-        await callback.answer("Некорректные данные")
+        await callback.answer(LEXICON_RU['start_invalid_data'])
         return
     if day_idx not in range(7):
-        await callback.answer("Некорректный день")
+        await callback.answer(LEXICON_RU['start_invalid_day'])
         return
     
     user = await update_user_digest_day(session, callback.from_user.id, day_idx)
@@ -278,10 +241,10 @@ async def process_digest_time(callback: types.CallbackQuery, session: AsyncSessi
     try:
         time_idx = int(callback.data.split("_")[1])
     except (ValueError, IndexError):
-        await callback.answer("Некорректные данные")
+        await callback.answer(LEXICON_RU['start_invalid_data'])
         return
     if time_idx not in range(0, 24, 2):
-        await callback.answer("Некорректное время")
+        await callback.answer(LEXICON_RU['start_invalid_time_value'])
         return
     
     user = await update_user_digest_time(session, callback.from_user.id, time_idx)

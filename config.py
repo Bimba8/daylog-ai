@@ -13,6 +13,10 @@ class Setting(BaseSettings):
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
+    SENTRY_DSN: str
+    LANGFUSE_SECRET_KEY: str
+    LANGFUSE_PUBLIC_KEY: str
+    LANGFUSE_BASE_URL: str
     
     # Настройки Pydantic: говорим ему читать файл .env
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

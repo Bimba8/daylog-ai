@@ -1,10 +1,13 @@
 import asyncio
+import sentry_sdk
+
 from loguru import logger
 from config import config
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.redis import RedisStorage
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from db.database import init_db, async_session, engine
 from db.queries import get_all_users
 from bot.services.ai import ai_router
@@ -18,10 +21,18 @@ from bot.services.scheduler import scheduler, schedule_daily_reminder, schedule_
 from bot.services.saver import cancel_background_tasks
 from bot.middlewares.throttle import ThrottleMiddleware
 from bot.middlewares.db import DbSessionMiddleware
-
 from bot.logging_config import setup_logging
+
 setup_logging()
 logger = logger.bind(module="BOOT")
+
+if config.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=config.SENTRY_DSN,
+        integrations=[AsyncioIntegration()],
+        traces_sample_rate=1.0,
+        environment="production"
+    )
 
 
 async def on_startup(bot: Bot):
