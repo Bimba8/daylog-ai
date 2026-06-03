@@ -71,7 +71,9 @@ services:
       environment:
         - MB_DB_FILE=/metabase.db/metabase.db
       depends_on:
-        - db # Замени на название твоего сервиса с PostgreSQL, если оно другое
+        - db
+      networks:          
+        - backend
 
 networks:
   backend:
