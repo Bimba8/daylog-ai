@@ -169,7 +169,7 @@ async def get_ai_metrics(user_text: str) -> dict | None:
         logger.warning("Groq 8B недоступен для метрик ({}), фоллбэк → Google", e)
         
         try:
-            response = await ai_router._call_google("gemini-2.5-flash", messages, is_json=True)
+            response = await ai_router._call_google(GOOGLE_MODEL, messages, is_json=True)
             raw_text = response['candidates'][0]['content']['parts'][0]['text']
         except Exception as e2:
             logger.error("Все провайдеры лежат для метрик: {}", e2)
@@ -225,7 +225,7 @@ async def generate_weekly_digest(entries: list) -> str | None:
     
     try:
         # 1. Дергаем Gemini с флагом is_json=True
-        response = await ai_router._call_google("gemini-2.5-flash", messages, is_json=True)
+        response = await ai_router._call_google(GOOGLE_MODEL, messages, is_json=True)
         raw_text = response['candidates'][0]['content']['parts'][0]['text']
         
         # 2. Парсим ответ
