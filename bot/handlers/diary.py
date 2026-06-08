@@ -32,6 +32,7 @@ async def cmd_daylog(message: types.Message, state: FSMContext, session: AsyncSe
         reply_markup=get_cancel_kb()
         )
      
+FORBIDDEN_PATTERNS = ["забудь", "игнорируй", "ты теперь", "ты не", "forget", "ignore"]
 
 @router.message(DiaryState.waiting_for_story)
 async def process_story(message: types.Message, state: FSMContext, session: AsyncSession):
@@ -52,6 +53,10 @@ async def process_story(message: types.Message, state: FSMContext, session: Asyn
         await message.answer(LEXICON_RU['diary_ai_processing'])
         return
     await state.update_data(ai_processing=True)
+    
+    if any(pattern in message.text.lower() for pattern in FORBIDDEN_PATTERNS):
+        await message.answer("Я не могу этого сделать, давай лучше поговорим о твоем дне.")
+        return
     
     processing_msg = await message.answer(LEXICON_RU['diary_analyzing_day'])
     
@@ -135,6 +140,10 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
     data = await state.get_data()
     if data.get("ai_processing"):
         await message.answer(LEXICON_RU['diary_ai_processing'])
+        return
+    
+    if any(pattern in message.text.lower() for pattern in FORBIDDEN_PATTERNS):
+        await message.answer("Я не могу этого сделать, давай лучше поговорим о твоем дне.")
         return
     
     cancel_nudge(message.from_user.id)

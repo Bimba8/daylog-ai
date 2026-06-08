@@ -65,7 +65,7 @@ class AIRouter:
         payload = {
             "model": model,
             "messages": messages,
-            "temperature": 0.1 if is_json else 0.6,
+            "temperature": 0.1 if is_json else 0.5,
         }
         if is_json:
             payload["response_format"] = {"type": "json_object"}
@@ -121,8 +121,8 @@ GOOGLE_MODEL = "gemini-3.1-flash-lite"
 async def get_ai_response(user_text: str) -> str | None:
     """Каскадный запрос к AI: Groq 70B → Groq 8B → Gemini."""
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_text}
+        {"role": "system", "content": f"### SYSTEM INSTRUCTIONS ###\n{SYSTEM_PROMPT}\n\n### END OF INSTRUCTIONS ###"},
+        {"role": "user", "content": f"### USER INPUT ###\n{user_text}\n\n### END OF USER INPUT ###"}
     ]
     
     try:
