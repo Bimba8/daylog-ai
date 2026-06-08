@@ -55,6 +55,7 @@ async def process_story(message: types.Message, state: FSMContext, session: Asyn
     await state.update_data(ai_processing=True)
     
     if any(pattern in message.text.lower() for pattern in FORBIDDEN_PATTERNS):
+        await state.update_data(ai_processing=False) # <--- ВОТ ЭТО ВАЖНО
         await message.answer("Я не могу этого сделать, давай лучше поговорим о твоем дне.")
         return
     
@@ -143,6 +144,7 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
         return
     
     if any(pattern in message.text.lower() for pattern in FORBIDDEN_PATTERNS):
+        await state.update_data(ai_processing=False)
         await message.answer("Я не могу этого сделать, давай лучше поговорим о твоем дне.")
         return
     
