@@ -17,9 +17,9 @@ engine = create_async_engine(
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 # Функция, которая физически создаст таблицы по нашим "чертежам"
-async def init_db():
-    # Мы асинхронно подключаемся к базе (engine.begin())
-    # Когда код внутри блока закончится, async with сам разорвет соединение.
-    async with engine.begin() as conn:
-        # Берем метаданные из Base и просим базу создать все таблицы
-        await conn.run_sync(Base.metadata.create_all)
+# async def init_db():                                             !!! СЕЙЧАС НЕ АКТУАЛЬНО, ВНЕДРИЛИ ALEMBIC !!!
+#     # Мы асинхронно подключаемся к базе (engine.begin())
+#     # Когда код внутри блока закончится, async with сам разорвет соединение.
+#     async with engine.begin() as conn:
+#         # Берем метаданные из Base и просим базу создать все таблицы
+#         await conn.run_sync(Base.metadata.create_all)

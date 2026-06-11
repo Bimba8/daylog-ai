@@ -8,7 +8,7 @@ from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.redis import RedisStorage
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
-from db.database import init_db, async_session, engine
+from db.database import async_session, engine
 from db.queries import get_all_users
 from bot.services.ai import ai_router
 from bot.handlers.history import router as history_router
@@ -71,7 +71,7 @@ async def on_shutdown(bot: Bot):
     logger.info("Планировщик, фоновые задачи и БД закрыты")
 
 async def main():
-    await init_db()
+    #await init_db()                                                     !!! СЕЙЧАС НЕ АКТУАЛЬНО, ВНЕДРИЛИ ALEMBIC !!!
     
     # Bot, storage, dispatcher создаются здесь (не на уровне модуля)
     # для корректного lifecycle и тестируемости.
