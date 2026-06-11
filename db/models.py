@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import BigInteger, DateTime, Text, func, ForeignKey, String, Integer
+from sqlalchemy import BigInteger, DateTime, Text, func, ForeignKey, String, Integer, Index
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 # Это базовый класс, от которого будут наследоваться все наши таблицы. 
@@ -30,6 +30,7 @@ class User(Base):
     
 class DiaryEntry(Base):
     __tablename__ = 'diary_entries'
+    __table_args__ = (Index('idx_diary_entries_user_created', 'user_id', 'created_at'),)
     
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id')) # Вот так мы создаем связь. Мы указываем имя_таблицы.имя_колонки ('users.id') в функции ForeignKey
