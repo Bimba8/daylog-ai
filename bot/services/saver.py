@@ -27,6 +27,7 @@ async def finalize_diary_entry(
     chat_id: int, 
     user_id: int, 
     text: str,
+    conversation_log: str | None = None,
     state: FSMContext = None, 
     session: AsyncSession = None,
     loading_msg_id: int | None = None
@@ -34,12 +35,12 @@ async def finalize_diary_entry(
     """Финализация записи дневника: сохранение в БД + запуск фонового AI-анализа."""
     if session:
         # Middleware-сессия — flush в add_diary_entry, коммит в middleware
-        new_entry = await add_diary_entry(session, user_id, text)
+        new_entry = await add_diary_entry(session, user_id, user_text=text, conversation_log=conversation_log)
     else:
         # Standalone-сессия (scheduler/night_cleaner) — явный commit/rollback
         async with async_session() as standalone_session:
             try:
-                new_entry = await add_diary_entry(standalone_session, user_id, text)
+                new_entry = await add_diary_entry(standalone_session, user_id, user_text=text, conversation_log=conversation_log)
                 await standalone_session.commit()
             except Exception:
                 await standalone_session.rollback()

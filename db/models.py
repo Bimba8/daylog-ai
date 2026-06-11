@@ -36,6 +36,7 @@ class DiaryEntry(Base):
     user_text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     ai_metrics: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    conversation_log: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Обратная связь: entry.user вернет объект User
     user: Mapped["User"] = relationship(back_populates="entries")

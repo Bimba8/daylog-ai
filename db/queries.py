@@ -45,12 +45,13 @@ async def get_all_users(session: AsyncSession) -> list[User]:
     return result.scalars().all()
 
 
-async def add_diary_entry(session: AsyncSession, tg_id: int, user_text: str) -> DiaryEntry:
+async def add_diary_entry(session: AsyncSession, tg_id: int, user_text: str, conversation_log: str | None = None) -> DiaryEntry:
     """Создать запись дневника. flush() — для получения ID, коммит в middleware."""
     user, _ = await get_or_create_user(session, tg_id)
     new_entry = DiaryEntry(
         user_id=user.id, 
         user_text=user_text,
+        conversation_log=conversation_log,
         created_at=datetime.now(timezone.utc).replace(tzinfo=None)  # Бронебойный UTC
     )
     session.add(new_entry)

@@ -65,7 +65,8 @@ async def process_story(message: types.Message, state: FSMContext, session: Asyn
             bot=message.bot, 
             chat_id=message.chat.id, 
             user_id=message.from_user.id, 
-            text=message.text, 
+            text=message.text,
+            conversation_log=f"User: {message.text}", 
             state=state, 
             session=session
         )
@@ -83,7 +84,8 @@ async def process_story(message: types.Message, state: FSMContext, session: Asyn
             bot=message.bot, 
             chat_id=message.chat.id, 
             user_id=message.from_user.id, 
-            text=message.text, 
+            text=message.text,
+            conversation_log=f"User: {message.text}",  
             state=state,
             session=session
         )
@@ -94,7 +96,7 @@ async def process_story(message: types.Message, state: FSMContext, session: Asyn
         return
     
     else:
-        await state.update_data(story=f"User: {message.text}", last_ai_question=ai_response, turn_count=1)
+        await state.update_data(story=f"User: {message.text}", user_text=message.text, last_ai_question=ai_response, turn_count=1)
         await state.set_state(DiaryState.waiting_for_answer)
         
         await safe_delete(processing_msg)
@@ -141,16 +143,19 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
     cancel_night_cleaner(message.from_user.id)
     
     story = data.get("story")
+    user_text = data.get("user_text", "")
     last_ai_question = data.get("last_ai_question")
     turn_count = data.get("turn_count", 1)
     new_story = f"{story}\n\nAI: {last_ai_question}\n\nUser: {message.text}"
+    new_user_text = f"{user_text}\n{message.text}"
     
     if message.text.lower() == "пока":
         await finalize_diary_entry(
             bot=message.bot, 
             chat_id=message.chat.id, 
             user_id=message.from_user.id, 
-            text=story, 
+            text=user_text,
+            conversation_log=story, 
             state=state,
             session=session
         )
@@ -166,7 +171,8 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
             bot=message.bot, 
             chat_id=message.chat.id, 
             user_id=message.from_user.id, 
-            text=new_story, 
+            text=new_user_text,
+            conversation_log=new_story, 
             state=state,
             session=session,
             loading_msg_id=loading_msg.message_id
@@ -187,7 +193,8 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
                 bot=message.bot, 
                 chat_id=message.chat.id, 
                 user_id=message.from_user.id, 
-                text=new_story, 
+                text=new_user_text,
+                conversation_log=new_story, 
                 state=state, 
                 session=session
             )
@@ -208,7 +215,8 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
                 bot=message.bot, 
                 chat_id=message.chat.id, 
                 user_id=message.from_user.id, 
-                text=new_story, 
+                text=new_user_text,
+                conversation_log=new_story, 
                 state=state,
                 session=session
             )
@@ -221,6 +229,7 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
         # Диалог продолжается до кнопки «Завершить» или лимита раундов.
         await state.update_data(
             story=new_story,
+            user_text=new_user_text,
             last_ai_question=ai_response,
             turn_count=turn_count + 1
         )
@@ -259,8 +268,9 @@ async def finish_diary_callback(callback: types.CallbackQuery, state: FSMContext
     
     data = await state.get_data()
     story = data.get("story", "")
+    user_text = data.get("user_text", "")
     
-    if not story:
+    if not user_text:
         await state.clear()
         await callback.answer(LEXICON_RU['diary_finish_no_text'])
         return
@@ -278,7 +288,8 @@ async def finish_diary_callback(callback: types.CallbackQuery, state: FSMContext
         bot=callback.bot,
         chat_id=callback.message.chat.id,
         user_id=callback.from_user.id,
-        text=story,
+        text=user_text,
+        conversation_log=story,
         state=state,
         session=session,
         loading_msg_id=loading_msg.message_id  # <--- Передаем ID нашей заглушки
