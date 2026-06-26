@@ -26,6 +26,7 @@ class User(Base):
     
     # Связь с записями дневника: user.entries вернет все DiaryEntry этого юзера
     entries: Mapped[list["DiaryEntry"]] = relationship(back_populates="user", lazy="selectin")
+    digests: Mapped[list["WeeklyDigest"]] = relationship(back_populates="user", lazy="selectin")
     
     
 class DiaryEntry(Base):
@@ -41,3 +42,13 @@ class DiaryEntry(Base):
     
     # Обратная связь: entry.user вернет объект User
     user: Mapped["User"] = relationship(back_populates="entries")
+    
+class WeeklyDigest(Base):
+    __tablename__ = 'weekly_digests'
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    content: Mapped[str] = mapped_column(Text)
+    
+    user: Mapped["User"] = relationship(back_populates="digests")

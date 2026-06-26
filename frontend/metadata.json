@@ -1,0 +1,6 @@
+{
+  "name": "DayLog AI",
+  "description": "Unified tracker of mood, energy, stress, and productivity.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

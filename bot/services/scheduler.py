@@ -11,7 +11,7 @@ from apscheduler.jobstores.redis import RedisJobStore
 from apscheduler.jobstores.base import JobLookupError
 from config import config
 from db.database import async_session
-from db.queries import check_today_entry, get_last_week_entries, get_user, get_all_users
+from db.queries import check_today_entry, get_last_week_entries, get_user, get_all_users, add_weekly_digest
 from bot.keyboards.main_kb import get_report_kb
 from bot.services.saver import finalize_diary_entry
 from bot.services.ai import generate_weekly_digest
@@ -210,12 +210,15 @@ async def _process_single_user_digest(bot: Bot, user_id: int, tz_str: str) -> No
     async with async_session() as session:
         entries = await get_last_week_entries(session, user_id, tz_str=tz_str)
         
-    if len(entries) < 2:
-        return # Слишком мало данных, скипаем тихо или можно отправить уведомление
+        if len(entries) < 2:
+            return # Слишком мало данных, скипаем тихо или можно отправить уведомление
+        
+        digest = await generate_weekly_digest(entries)
+        if digest:
+            await safe_send(bot, user_id, text=digest)
+            await add_weekly_digest(session, user_id, content=digest)
+            await session.commit()
     
-    digest = await generate_weekly_digest(entries)
-    if digest:
-        await safe_send(bot, user_id, text=digest)
 
 
 async def run_global_weekly_digest() -> None:
