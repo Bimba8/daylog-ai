@@ -1,14 +1,14 @@
 import json
-import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_db, get_current_user
 from bot.handlers.stats import calculate_stats
 from bot.utils import safe_tz
+from bot.services.ai import generate_user_insights
 from db.models import User
-from db.queries import get_entry_count, get_user_entries, get_user_digest, get_entries_by_date_range
+from db.queries import get_entry_count, get_user_entries, get_user_digest, get_entries_by_date_range, get_latest_diary_entry
 
 router = APIRouter(prefix="/stats", tags=["Stats"])
 
@@ -203,7 +203,44 @@ async def get_analytics(
         "productivity": {"value": round(total_prod / days_with_data, 1) if days_with_data else 0, "diff": "0.0"},
     }
     
+    insights_data = {
+        "resources": ["Спорт", "Код", "Сон", "Прогулка"],
+        "energy_leaks": ["Дедлайны", "Недосып", "Алкоголь"]
+    }
+    
+    if user.cached_insights:
+        try:
+            insights_data = json.loads(user.cached_insights)
+            
+        except (json.JSONDecodeError, TypeError):
+            pass
+        
+    latest_entry = await get_latest_diary_entry(session, user.telegram_id)
+    
+    if latest_entry:
+        need_update = False
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        
+        if not user.cached_insights or not user.insights_updated_at:
+            need_update = True
+        else:
+            cache_age = now_utc - user.insights_updated_at
+            
+            if cache_age > timedelta(hours=24) and latest_entry.created_at >= user.insights_updated_at:
+                need_update = True
+                
+        if need_update:
+            recent = await get_user_entries(session, user.telegram_id, order="desc", limit=30)
+            new_insight = await generate_user_insights(recent)
+            
+            if new_insight:
+                insights_data = new_insight
+                user.cached_insights = json.dumps(new_insight, ensure_ascii=False)
+                user.insights_updated_at = now_utc
+                await session.commit()
+    
     return {
         "averages": global_avg,
-        "chart": chart_data
+        "chart": chart_data,
+        "insights": insights_data
     }

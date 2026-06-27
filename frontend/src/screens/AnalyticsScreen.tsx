@@ -51,6 +51,8 @@ export default function AnalyticsScreen() {
     stress: { value: 2.1, diff: '-0.5' }, productivity: { value: 4.3, diff: '+0.6' }
   };
 
+  const insights = analyticsData?.insights || { resources: ['Спорт', 'Код', 'Сон', 'Прогулка'], energy_leaks: ['Дедлайны', 'Недосып', 'Алкоголь'] };
+
   const stressValue = avgs.stress.value;
   let stressIcon = <AlertTriangle className="w-5 h-5" />;
   let stressColorClass = 'text-red-500 bg-red-100 dark:bg-red-950/40';
@@ -243,11 +245,17 @@ export default function AnalyticsScreen() {
               <h3 className="font-sans font-bold text-sm text-gray-950 dark:text-white">Что давало ресурс</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              {['Спорт', 'Код', 'Сон', 'Прогулка'].map((tag) => (
-                <span key={tag} className="px-3 py-1 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300 rounded-full font-sans text-xs font-semibold border border-green-100/50 dark:border-green-900/30">
-                  {tag}
+              {insights.resources.length === 0 ? (
+                <span className="text-gray-400 dark:text-slate-500 text-xs italic font-sans">
+                  Пока не обнаружено. Пора уделить время себе и отдохнуть! 🍵
                 </span>
-              ))}
+              ) : (
+                insights.resources.map((tag: string) => (
+                  <span key={tag} className="px-3 py-1 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300 rounded-full font-sans text-xs font-semibold border border-green-100/50 dark:border-green-900/30">
+                    {tag}
+                  </span>
+                ))
+              )}
             </div>
           </section>
 
@@ -257,11 +265,17 @@ export default function AnalyticsScreen() {
               <h3 className="font-sans font-bold text-sm text-gray-950 dark:text-white">Скрытые утечки энергии</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              {['Дедлайны', 'Недосып', 'Алкоголь'].map((tag) => (
-                <span key={tag} className="px-3 py-1 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300 rounded-full font-sans text-xs font-semibold border border-red-100/50 dark:border-red-900/30">
-                  {tag}
+              {insights.energy_leaks.length === 0 ? (
+                <span className="text-gray-400 dark:text-slate-500 text-xs italic font-sans">
+                  Всё идеально, утечек не обнаружено! ✨
                 </span>
-              ))}
+              ) : (
+                insights.energy_leaks.map((tag: string) => (
+                  <span key={tag} className="px-3 py-1 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300 rounded-full font-sans text-xs font-semibold border border-red-100/50 dark:border-red-900/30">
+                    {tag}
+                  </span>
+                ))
+              )}
             </div>
           </section>
         </div>

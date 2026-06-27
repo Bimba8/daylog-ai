@@ -4,7 +4,7 @@ from loguru import logger
 from config import config
 from tenacity import retry, wait_exponential_jitter, retry_if_exception_type, stop_after_attempt
 from langfuse import observe
-from bot.services.prompts import SYSTEM_PROMPT, METRICS_SYSTEM_PROMPT, DIGEST_SYSTEM_PROMPT
+from bot.services.prompts import SYSTEM_PROMPT, METRICS_SYSTEM_PROMPT, DIGEST_SYSTEM_PROMPT, INSIGHTS_SYSTEM_PROMPT
 
 logger = logger.bind(module="AI")
 
@@ -164,7 +164,7 @@ async def get_ai_metrics(user_text: str) -> dict | None:
     raw_text = None
     
     try:
-        response = await ai_router._call_groq("llama-3.1-8b-instant", messages, is_json=True)
+        response = await ai_router._call_groq(SECOND_GROQ_MODEL, messages, is_json=True)
         raw_text = response['choices'][0]['message']['content']
     except Exception as e:
         logger.warning("Groq 8B недоступен для метрик ({}), фоллбэк → Google", e)
@@ -261,3 +261,58 @@ async def generate_weekly_digest(entries: list) -> str | None:
     except Exception as e:
         logger.error("Ошибка генерации дайджеста: {}", e)
         return None
+    
+    
+async def generate_user_insights(entries: list) -> dict | None:
+    """Генерация ИИ-инсайтов (ресурсы и утечки энергии) по топ лучших и худших дней."""
+    
+    if not entries or len(entries) < 3:
+        # Если записей слишком мало для глубокого анализа
+        return {"resources": ["Сон", "Прогулка"], "energy_leaks": ["Дедлайны", "Недосып"]}
+    
+    scored_entries = []
+    for entry in entries:
+        if not entry.ai_metrics:
+            continue
+        
+        try:
+            m = json.loads(entry.ai_metrics)
+            score = m.get("mood", 3) + m.get("energy", 3)
+            scored_entries.append((score, entry.user_text))
+        except (json.JSONDecodeError, TypeError):
+            continue
+        
+    if not scored_entries:
+        return {"resources": ["Сон", "Прогулка"], "energy_leaks": ["Дедлайны", "Недосып"]}
+    
+    scored_entries.sort(key=lambda x: x[0])
+    bad_days = scored_entries[:5]
+    best_days = scored_entries[-5:]
+    
+    compiled_text = "### ДНИ УПАДКА (Низкие метрики) ###\n"
+    for _, text in bad_days:
+        compiled_text += f"- {text[:400]}\n"
+        
+    compiled_text += "\n### ДНИ НА ПОДЪЕМЕ (Высокие метрики) ###\n"
+    for _, text in best_days:
+        compiled_text += f"- {text[:400]}\n"
+        
+    messages = [
+        {"role": "system", "content": INSIGHTS_SYSTEM_PROMPT},
+        {"role": "user", "content": compiled_text}
+    ]
+    
+    try:
+        response = await ai_router._call_groq(MAIN_GROQ_MODEL, messages, is_json=True)
+        return json.loads(response['choices'][0]['message']['content'])
+    
+    except Exception as e:
+        logger.warning("Groq недоступен для инсайтов ({}), фоллбэк → Google", e)
+        
+        try:
+            response = await ai_router._call_google(GOOGLE_MODEL, messages, is_json=True)
+            return json.loads(response['candidates'][0]['content']['parts'][0]['text'])
+        
+        except Exception as e2:
+            logger.error("Все провайдеры лежат для инсайтов: {}", e2)
+            return {"resources": ["Сон", "Прогулка"], "energy_leaks": ["Дедлайны", "Недосып"]}
