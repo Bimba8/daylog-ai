@@ -119,6 +119,8 @@ async def get_analytics(
     days = 7 if period == "7days" else 30
     user_tz = safe_tz(user.timezone)
     
+    total_entries = await get_entry_count(session, user.telegram_id)
+    
     # Высчитываем локальные границы дат
     now_local = datetime.now(user_tz)
     today_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -242,5 +244,6 @@ async def get_analytics(
     return {
         "averages": global_avg,
         "chart": chart_data,
-        "insights": insights_data
+        "insights": insights_data,
+        "total_entries": total_entries
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Smile, Calendar, CheckCircle2 } from 'lucide-react';
 import { apiClient } from '../api/client';
+import EmptyState from '../components/EmptyState';
 
 const pluralizeDays = (count: number) => {
   const mod10 = count % 10;
@@ -77,6 +78,10 @@ export default function ProfileScreen() {
         <div className="bg-gray-100 dark:bg-slate-900 rounded-xl p-4 h-[160px]" />
       </div>
     );
+  }
+
+  if (!isLoading && stats?.total_entries === 0) {
+    return <EmptyState />;
   }
 
   return (

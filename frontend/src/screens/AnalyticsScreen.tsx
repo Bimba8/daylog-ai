@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Smile, Zap, TrendingUp, AlertTriangle, Sparkles, Sliders, Check } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { apiClient } from '../api/client';
+import EmptyState from '../components/EmptyState';
 
 type MetricType = 'mood' | 'energy' | 'stress' | 'productivity';
 
@@ -44,6 +45,10 @@ export default function AnalyticsScreen() {
         </div>
       </div>
     );
+  }
+
+  if (!isLoading && analyticsData?.total_entries === 0) {
+    return <EmptyState />;
   }
 
   const avgs = analyticsData?.averages || {
