@@ -115,7 +115,7 @@ class AIRouter:
             
 ai_router = AIRouter()
 MAIN_GROQ_MODEL = "llama-3.3-70b-versatile"
-SECOND_GROQ_MODEL = "llama-3.1-8b-instant"
+SECOND_GROQ_MODEL = "qwen/qwen3-32b"
 GOOGLE_MODEL = "gemini-3.1-flash-lite"
 
 async def get_ai_response(user_text: str) -> str | None:
