@@ -38,7 +38,14 @@ async def generate_and_save_metrics(bot: Bot, chat_id: int, entry_id: int, user_
     try: 
         # Стресс — инвертированная метрика (5 = плохо), поэтому переворачиваем его для корректного среднего
         adjusted_stress = 6 - stress_score
-        avg_score = round((mood_score + energy_score + adjusted_stress + productivity_score) / 4, 1)
+        is_chill = (productivity_score > 3 and energy_score < 3) or (mood_score >= 4 and stress_score <= 2 and energy_score < 3)
+        
+        if is_chill:
+            avg_score = round((mood_score + adjusted_stress) / 2, 1)
+        else:
+            avg_score = round((mood_score + energy_score + adjusted_stress + productivity_score) / 4, 1)
+        
+        
         final_text = f"📊 Итоги дня: {avg_score} / 5\n\n📝 {summary_text}"
         
         # safe_send обрабатывает TelegramForbiddenError и rate limits
