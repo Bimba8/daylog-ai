@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Подключаемся к базе от имени главного юзера и выполняем SQL
+# Подключаемся к базе от имени главного юзера и выполняем SQL-запрос
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     -- 1. Создаем пользователя (пароль подтянется из .env)
     CREATE USER metabase_ro WITH PASSWORD '${METABASE_RO_PASSWORD}';

@@ -27,5 +27,14 @@ __pycache__/
 
 files/
 daylog-ai-doc.md
+
 # Log files
 logs/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+frontend/*.local
+frontend/.eslintcache
