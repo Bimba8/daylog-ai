@@ -233,7 +233,7 @@ async def get_analytics(
                 
         if need_update:
             recent = await get_user_entries(session, user.telegram_id, order="desc", limit=30)
-            new_insight = await generate_user_insights(recent)
+            new_insight = await generate_user_insights(recent, lang=user.language_code or "ru")
             
             if new_insight:
                 insights_data = new_insight

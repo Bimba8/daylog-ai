@@ -3,10 +3,11 @@ import { Smile, Zap, TrendingUp, AlertTriangle, Sparkles, Sliders, Check } from 
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { apiClient } from '../api/client';
 import EmptyState from '../components/EmptyState';
+import { t, Language } from '../i18n';
 
 type MetricType = 'mood' | 'energy' | 'stress' | 'productivity';
 
-export default function AnalyticsScreen() {
+export default function AnalyticsScreen({ lang = 'ru' }: { lang?: Language }) {
   const [timePeriod, setTimePeriod] = useState<'7days' | '30days'>('30days');
   const [activeMetric, setActiveMetric] = useState<MetricType>('mood');
   
@@ -48,7 +49,7 @@ export default function AnalyticsScreen() {
   }
 
   if (!isLoading && analyticsData?.total_entries === 0) {
-    return <EmptyState />;
+    return <EmptyState lang={lang} />;
   }
 
   const avgs = analyticsData?.averages || {
@@ -77,33 +78,33 @@ export default function AnalyticsScreen() {
   }
 
   const balanceMetrics = [
-    { name: 'Настроение', value: avgs.mood.value, percentage: (avgs.mood.value / 5) * 100, color: 'bg-blue-500' },
-    { name: 'Энергия', value: avgs.energy.value, percentage: (avgs.energy.value / 5) * 100, color: 'bg-cyan-500' },
-    { name: 'Стресс', value: stressValue, percentage: (stressValue / 5) * 100, color: stressProgressBarColor },
-    { name: 'Продуктивность', value: avgs.productivity.value, percentage: (avgs.productivity.value / 5) * 100, color: 'bg-indigo-500' },
+    { name: t('mood', lang), value: avgs.mood.value, percentage: (avgs.mood.value / 5) * 100, color: 'bg-blue-500' },
+    { name: t('energy', lang), value: avgs.energy.value, percentage: (avgs.energy.value / 5) * 100, color: 'bg-cyan-500' },
+    { name: t('stress', lang), value: stressValue, percentage: (stressValue / 5) * 100, color: stressProgressBarColor },
+    { name: t('productivity', lang), value: avgs.productivity.value, percentage: (avgs.productivity.value / 5) * 100, color: 'bg-indigo-500' },
   ];
 
   const metricTabsData = [
     {
-      id: 'mood' as MetricType, label: 'Настроение', title: 'СРЕДНЕЕ НАСТРОЕНИЕ',
+      id: 'mood' as MetricType, label: t('mood', lang), title: lang === 'en' ? 'AVERAGE MOOD' : 'СРЕДНЕЕ НАСТРОЕНИЕ',
       value: String(avgs.mood.value), diff: avgs.mood.diff,
       icon: <Smile className="w-5 h-5" />,
       colorClass: 'text-blue-600 bg-blue-100 dark:bg-blue-950/40', strokeColor: '#3B82F6'
     },
     {
-      id: 'energy' as MetricType, label: 'Энергия', title: 'СРЕДНЯЯ ЭНЕРГИЯ',
+      id: 'energy' as MetricType, label: t('energy', lang), title: lang === 'en' ? 'AVERAGE ENERGY' : 'СРЕДНЯЯ ЭНЕРГИЯ',
       value: String(avgs.energy.value), diff: avgs.energy.diff,
       icon: <Zap className="w-5 h-5" />,
       colorClass: 'text-cyan-500 bg-cyan-50 dark:bg-cyan-950/40', strokeColor: '#06b6d4'
     },
     {
-      id: 'stress' as MetricType, label: 'Стресс', title: 'УРОВЕНЬ СТРЕССА',
+      id: 'stress' as MetricType, label: t('stress', lang), title: lang === 'en' ? 'STRESS LEVEL' : 'УРОВЕНЬ СТРЕССА',
       value: String(stressValue), diff: avgs.stress.diff,
       icon: stressIcon,
       colorClass: stressColorClass, strokeColor: stressStrokeColor
     },
     {
-      id: 'productivity' as MetricType, label: 'Продуктивность', title: 'ПРОДУКТИВНОСТЬ',
+      id: 'productivity' as MetricType, label: t('productivity', lang), title: lang === 'en' ? 'PRODUCTIVITY' : 'ПРОДУКТИВНОСТЬ',
       value: String(avgs.productivity.value), diff: avgs.productivity.diff,
       icon: <TrendingUp className="w-5 h-5" />,
       colorClass: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40', strokeColor: '#6366F1'
@@ -123,7 +124,7 @@ export default function AnalyticsScreen() {
               timePeriod === '7days' ? 'bg-[#00418f] text-white shadow-xs' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
-            7 Дней
+            {lang === 'en' ? '7 Days' : '7 Дней'}
           </button>
           <button
             onClick={() => setTimePeriod('30days')}
@@ -131,7 +132,7 @@ export default function AnalyticsScreen() {
               timePeriod === '30days' ? 'bg-[#00418f] text-white shadow-xs' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
-            30 Дней
+            {lang === 'en' ? '30 Days' : '30 Дней'}
           </button>
         </div>
       </div>
@@ -158,7 +159,7 @@ export default function AnalyticsScreen() {
         <div className="flex justify-between items-end">
           <div>
             <p className="font-sans text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-widest font-bold">
-              {currentTab.title} ({timePeriod === '7days' ? '7 Дней' : '30 Дней'})
+              {currentTab.title} ({timePeriod === '7days' ? (lang === 'en' ? '7 Days' : '7 Дней') : (lang === 'en' ? '30 Days' : '30 Дней')})
             </p>
             <div className="flex items-baseline gap-1.5 mt-0.5">
               <h2 className="font-sans font-bold text-3xl text-gray-900 dark:text-white">
@@ -226,7 +227,9 @@ export default function AnalyticsScreen() {
         <section className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-gray-200/40 dark:border-slate-800/40 flex flex-col gap-4">
           <div className="flex items-center gap-1.5">
             <Sliders className="w-4.5 h-4.5 text-[#00418f] dark:text-[#adc6ff]" />
-            <h3 className="font-sans font-bold text-[15px] text-gray-950 dark:text-white">Баланс состояния</h3>
+            <h3 className="font-sans font-bold text-[15px] text-gray-950 dark:text-white">
+              {lang === 'en' ? 'State Balance' : 'Баланс состояния'}
+            </h3>
           </div>
           <div className="flex flex-col gap-4 mt-2">
             {balanceMetrics.map((met) => (
@@ -247,12 +250,14 @@ export default function AnalyticsScreen() {
           <section className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-200/40 dark:border-slate-800/40 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <span className="text-lg">🚀</span>
-              <h3 className="font-sans font-bold text-sm text-gray-950 dark:text-white">Что давало ресурс</h3>
+              <h3 className="font-sans font-bold text-sm text-gray-950 dark:text-white">
+                {t('top_resources', lang)}
+              </h3>
             </div>
             <div className="flex flex-wrap gap-2">
               {insights.resources.length === 0 ? (
                 <span className="text-gray-400 dark:text-slate-500 text-xs italic font-sans">
-                  Пока не обнаружено. Пора уделить время себе и отдохнуть! 🍵
+                  {lang === 'en' ? 'None found yet. Take some time to rest! 🍵' : 'Пока не обнаружено. Пора уделить время себе и отдохнуть! 🍵'}
                 </span>
               ) : (
                 insights.resources.map((tag: string) => (
@@ -267,12 +272,14 @@ export default function AnalyticsScreen() {
           <section className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-200/40 dark:border-slate-800/40 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <span className="text-lg">🪫</span>
-              <h3 className="font-sans font-bold text-sm text-gray-950 dark:text-white">Скрытые утечки энергии</h3>
+              <h3 className="font-sans font-bold text-sm text-gray-950 dark:text-white">
+                {t('top_leaks', lang)}
+              </h3>
             </div>
             <div className="flex flex-wrap gap-2">
               {insights.energy_leaks.length === 0 ? (
                 <span className="text-gray-400 dark:text-slate-500 text-xs italic font-sans">
-                  Всё идеально, утечек не обнаружено! ✨
+                  {lang === 'en' ? 'Everything is perfect, no leaks found! ✨' : 'Всё идеально, утечек не обнаружено! ✨'}
                 </span>
               ) : (
                 insights.energy_leaks.map((tag: string) => (

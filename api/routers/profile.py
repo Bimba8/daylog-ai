@@ -15,7 +15,8 @@ async def get_my_profile(user: User = Depends(get_current_user)):
         "timezone": user.timezone,
         "reminder_time": user.reminder_time,
         "digest_day": user.digest_day,
-        "digest_time": user.digest_time
+        "digest_time": user.digest_time,
+        "language_code": user.language_code
     }
     
 class SettingsUpdate(BaseModel):
@@ -23,6 +24,7 @@ class SettingsUpdate(BaseModel):
     reminder_time: str | None = None
     digest_day: int | None = None
     digest_time: int | None = None
+    language_code: str | None = None
     
     
 @router.post("/settings")
@@ -39,6 +41,10 @@ async def update_settings(
         user.digest_day = settings.digest_day
     if settings.digest_time is not None:
         user.digest_time = settings.digest_time
+    if settings.language_code is not None and settings.language_code in ("ru", "en"):
+        if user.language_code != settings.language_code:
+            user.language_code = settings.language_code
+            user.cached_insights = None
     
     await session.commit()
     return {"status": "success"}

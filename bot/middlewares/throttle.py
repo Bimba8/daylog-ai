@@ -10,12 +10,12 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message
 from redis.asyncio import Redis
 from config import config
+from bot.lexicon.i18n import t
 
 _logger = logger.bind(module="THROTTLE")
 
 RATE_LIMIT = 5
 RATE_WINDOW = 10
-COOLDOWN_MSG = "⏳ <b>Слишком быстро!</b>\n\nПодожди пару секунд и попробуй снова."
 
 
 class ThrottleMiddleware(BaseMiddleware):
@@ -49,7 +49,9 @@ class ThrottleMiddleware(BaseMiddleware):
 
         if current > RATE_LIMIT:
             _logger.warning("Rate limit: user={}, count={}", user_id, current)
-            await event.answer(COOLDOWN_MSG)
+            # lang ещё не доступен (I18n middleware позже), берём из data если есть
+            lang = data.get("lang", "ru")
+            await event.answer(t('common_throttle', lang))
             return
 
         return await handler(event, data)

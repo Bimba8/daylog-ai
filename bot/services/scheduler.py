@@ -13,9 +13,11 @@ from config import config
 from db.database import async_session
 from db.queries import check_today_entry, get_last_week_entries, get_user, get_all_users, add_weekly_digest
 from bot.keyboards.main_kb import get_report_kb
+from bot.lexicon.i18n import t
 from bot.services.saver import finalize_diary_entry
 from bot.services.ai import generate_weekly_digest
 from bot.utils.telegram import safe_send
+from bot.utils import safe_tz
 
 logger = logger.bind(module="SCHEDULER")
 
@@ -55,14 +57,13 @@ def get_bot() -> Bot:
 # Nudge — ephemeral, MemoryJobStore (default)
 # ──────────────────────────────────────────────
 
-async def send_nudge_message(bot: Bot, chat_id: int) -> None:
-    await safe_send(
-        bot, chat_id,
-        text=(
-            "👀 <b>Я всё еще жду ответ</b>\n\n"
-            "Мы остановились на самом интересном месте. Допиши мысль или отправь «пока», чтобы завершить запись."
-        )
-    )
+async def send_nudge_message(bot: Bot, chat_id: int, user_id: int) -> None:
+    lang = "ru"
+    async with async_session() as session:
+        user = await get_user(session, user_id)
+        if user:
+            lang = user.language_code or "ru"
+    await safe_send(bot, chat_id, text=t('sched_nudge', lang))
 
 def schedule_nudge(bot: Bot, user_id: int, chat_id: int) -> None:
     run_time = datetime.now(timezone.utc) + timedelta(hours=2)
@@ -73,7 +74,7 @@ def schedule_nudge(bot: Bot, user_id: int, chat_id: int) -> None:
         run_date=run_time,
         id=f"nudge_{user_id}",
         replace_existing=True,
-        kwargs={'bot': bot, 'chat_id': chat_id}
+        kwargs={'bot': bot, 'chat_id': chat_id, 'user_id': user_id}
     )
 
 def cancel_nudge(user_id: int) -> None:
@@ -103,13 +104,11 @@ async def send_daily_reminder(user_id: int) -> None:
             logger.error("Ошибка проверки записи юзера {}: {}", user_id, e)
             return
     
+    lang = user.language_code or "ru"
     await safe_send(
         bot, user_id,
-        text=(
-            "🌙 <b>Время подвести итоги</b>\n\n"
-            "Как прошел день? Жми кнопку ниже и вываливай всё как есть."
-        ),
-        reply_markup=get_report_kb()
+        text=t('sched_daily_reminder', lang),
+        reply_markup=get_report_kb(lang)
     )
         
 def schedule_daily_reminder(bot: Bot, user_id: int, time_str: str, tz_str: str) -> None:
@@ -156,18 +155,15 @@ async def run_night_cleaner(bot: Bot, storage: BaseStorage, user_id: int, chat_i
         logger.error("Night cleaner: ошибка сохранения для юзера {}: {}", user_id, e)
         return
     
-    await safe_send(
-        bot, chat_id,
-        text=(
-            "💾 <b>Автосохранение сработало</b>\n\n"
-            "Диалог завис, поэтому я заботливо закрыл и сохранил твою запись.\n\n"
-            "<i>Уже считаю AI-метрики, результаты будут в статистике.</i>"
-        )
-    )
+    lang = "ru"
+    async with async_session() as session_nc:
+        user_obj = await get_user(session_nc, user_id)
+        if user_obj:
+            lang = user_obj.language_code or "ru"
+    await safe_send(bot, chat_id, text=t('sched_night_cleaner', lang))
 
 def schedule_night_cleaner(bot: Bot, storage: BaseStorage, user_id: int, chat_id: int, tz_str: str = "Europe/Moscow") -> None:
     """Одноразовый cleaner на ближайшие 03:00 в таймзоне юзера."""
-    from bot.utils import safe_tz
     user_tz = safe_tz(tz_str)
     now_local = datetime.now(user_tz)
     
@@ -213,7 +209,11 @@ async def _process_single_user_digest(bot: Bot, user_id: int, tz_str: str) -> No
         if len(entries) < 2:
             return # Слишком мало данных, скипаем тихо или можно отправить уведомление
         
-        digest = await generate_weekly_digest(entries)
+        # Определяем язык юзера
+        user = await get_user(session, user_id)
+        lang = user.language_code if user else "ru"
+        
+        digest = await generate_weekly_digest(entries, lang=lang)
         if digest:
             await safe_send(bot, user_id, text=digest)
             await add_weekly_digest(session, user_id, content=digest)
@@ -232,7 +232,7 @@ async def run_global_weekly_digest() -> None:
     target_users = []
     for user in users:
         try:
-            now_local = datetime.now(ZoneInfo(user.timezone))
+            now_local = datetime.now(safe_tz(user.timezone))
             if now_local.weekday() == user.digest_day and now_local.hour == user.digest_time:
                 target_users.append(user)
         except Exception as e:

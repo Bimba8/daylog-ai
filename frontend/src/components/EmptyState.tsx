@@ -1,7 +1,8 @@
 import React from 'react';
 import { Sparkles } from 'lucide-react';
+import { t, Language } from '../i18n';
 
-export default function EmptyState() {
+export default function EmptyState({ lang = 'ru' }: { lang?: Language }) {
   const handleClose = () => {
     if (window.Telegram?.WebApp?.close) {
       window.Telegram.WebApp.close();
@@ -23,10 +24,10 @@ export default function EmptyState() {
 
       {/* Текст */}
       <h3 className="font-sans font-bold text-xl text-gray-900 dark:text-white mb-2 tracking-tight">
-        Тут пока пусто!
+        {t('empty_data', lang)}
       </h3>
       <p className="font-sans text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-xs leading-relaxed">
-        Возвращайся в бота и расскажи, как прошел твой день, а ИИ соберет для тебя аналитику.
+        {t('empty_data_desc', lang)}
       </p>
 
       {/* Кнопка CTA */}
@@ -34,7 +35,7 @@ export default function EmptyState() {
         onClick={handleClose}
         className="w-full max-w-[240px] py-3 bg-[#00418f] hover:bg-[#00316e] text-white font-sans text-sm font-semibold rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
       >
-        <span>📝 Создать первую запись</span>
+        <span>📝 {t('no_records_yet', lang).split('.')[0]}</span>
       </button>
     </div>
   );

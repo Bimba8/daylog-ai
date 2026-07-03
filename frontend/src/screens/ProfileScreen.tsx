@@ -3,7 +3,13 @@ import { BookOpen, Smile, Calendar, CheckCircle2 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import EmptyState from '../components/EmptyState';
 
-const pluralizeDays = (count: number) => {
+
+import { t, Language } from '../i18n';
+
+const pluralizeDays = (count: number, lang: Language) => {
+  if (lang === 'en') {
+    return count === 1 ? 'Day' : 'Days';
+  }
   const mod10 = count % 10;
   const mod100 = count % 100;
   if (mod100 >= 11 && mod100 <= 19) return 'Дней';
@@ -12,7 +18,7 @@ const pluralizeDays = (count: number) => {
   return 'Дней';
 };
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ lang = 'ru' }: { lang?: Language }) {
   const [user, setUser] = useState<any>(null);
   const [stats, setStats] = useState<any>(null); // Добавили стейт для метрик
   const [isLoading, setIsLoading] = useState(true);
@@ -38,9 +44,13 @@ export default function ProfileScreen() {
     loadData();
   }, []);
 
-  const formatJoinDate = (dateString?: string) => {
+  const formatJoinDate = (dateString?: string, lang: Language = 'ru') => {
     if (!dateString) return '';
     const date = new Date(dateString);
+    if (lang === 'en') {
+      const formatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+      return `Joined ${formatter.format(date)}`;
+    }
     const formatter = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
     const genitiveDate = formatter.format(date).replace(/^\d+\s/, '');
     return `В приложении с ${genitiveDate}`;
@@ -81,7 +91,7 @@ export default function ProfileScreen() {
   }
 
   if (!isLoading && stats?.total_entries === 0) {
-    return <EmptyState />;
+    return <EmptyState lang={lang} />;
   }
 
   return (
@@ -102,7 +112,7 @@ export default function ProfileScreen() {
           {window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || user?.username || 'Загрузка...'}
         </h2>
         <p className="font-sans text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider font-semibold">
-          {formatJoinDate(user?.created_at)}
+          {formatJoinDate(user?.created_at, lang)}
         </p>
       </div>
 
@@ -111,13 +121,13 @@ export default function ProfileScreen() {
         <div className="absolute top-0 right-0 w-24 h-24 bg-[#00418f]/10 dark:bg-blue-500/10 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none" />
         
         <p className="font-sans text-xs text-gray-500 dark:text-gray-400 uppercase tracking-widest font-semibold mb-2">
-          🔥 Текущий стрик
+          🔥 {t('days_in_row', lang)}
         </p>
         <span className="text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-          {stats?.streak || 0} {pluralizeDays(stats?.streak || 0)}
+          {stats?.streak || 0} {pluralizeDays(stats?.streak || 0, lang)}
         </span>
         <p className="font-sans text-sm text-gray-600 dark:text-gray-300 mt-3 max-w-xs leading-relaxed">
-          Отличный результат! Продолжайте вести ежедневные записи для точных ИИ-инсайтов.
+          {t('streak_encouragement', lang)}
         </p>
       </div>
 
@@ -128,7 +138,7 @@ export default function ProfileScreen() {
           <div className="flex items-center gap-1.5 mb-2 text-[#00418f] dark:text-[#adc6ff]">
             <BookOpen className="w-4.5 h-4.5" />
             <p className="font-sans text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider">
-              Всего отчетов
+              {t('records_count', lang)}
             </p>
           </div>
           <p className="font-sans font-bold text-3xl text-gray-900 dark:text-white">
@@ -141,7 +151,7 @@ export default function ProfileScreen() {
           <div className="flex items-center gap-1.5 mb-2 text-amber-600 dark:text-[#ffb595]">
             <Smile className="w-4.5 h-4.5" />
             <p className="font-sans text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider">
-              Ср. настроение (7д)
+              {t('avg_mood', lang)} (7d)
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -169,7 +179,7 @@ export default function ProfileScreen() {
           <div className="flex items-center gap-1.5 mb-3 text-[#0058bc] dark:text-blue-400">
             <Calendar className="w-4.5 h-4.5" />
             <p className="font-sans text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider">
-              Активность (30д)
+              {lang === 'en' ? 'Activity (30d)' : 'Активность (30д)'}
             </p>
           </div>
           <div className="flex items-end justify-between">
@@ -192,10 +202,10 @@ export default function ProfileScreen() {
       <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-gray-200/40 dark:border-slate-800/40">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-sans font-bold text-[15px] text-gray-950 dark:text-white">
-            Календарь активности
+            {lang === 'en' ? 'Activity Map' : 'Календарь активности'}
           </h3>
           <span className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wider">
-            Последние 15 недель
+            {lang === 'en' ? 'Last 15 weeks' : 'Последние 15 недель'}
           </span>
         </div>
         

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Sparkles, Smile, Zap, AlertTriangle, CheckSquare, Loader2 } from 'lucide-react';
 import { apiClient } from '../api/client';
+import { t, Language } from '../i18n';
 
-export default function CalendarScreen() {
+export default function CalendarScreen({ lang = 'ru' }: { lang?: Language }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState<boolean>(false);
@@ -21,7 +22,7 @@ export default function CalendarScreen() {
   const startDayOffset = firstDay === 0 ? 6 : firstDay - 1; 
   const prevMonthDays = new Date(year, month, 0).getDate();
   
-  const monthName = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' }).format(currentDate);
+  const monthName = new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'ru-RU', { month: 'long', year: 'numeric' }).format(currentDate);
 
   useEffect(() => {
     async function fetchCalendar() {
@@ -152,7 +153,11 @@ export default function CalendarScreen() {
           )}
 
           <div className="grid grid-cols-7 mb-2 text-center text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider py-1">
-            <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+            {lang === 'en' ? (
+              <><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div></>
+            ) : (
+              <><div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div></>
+            )}
           </div>
 
           <div className="grid grid-cols-7 gap-y-2 gap-x-1.5 justify-items-center">
@@ -223,7 +228,7 @@ export default function CalendarScreen() {
             <div className="flex flex-col gap-5">
               <div className="flex justify-center border-b border-gray-100 dark:border-slate-800/60 pb-3">
                 <h3 className="font-sans font-bold text-xl text-gray-900 dark:text-white text-center">
-                  Отчет за {new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(new Date(year, month, selectedDay))}
+                  {lang === 'en' ? 'Log for ' : 'Отчет за '}{new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'ru-RU', { day: 'numeric', month: 'long' }).format(new Date(year, month, selectedDay))}
                 </h3>
               </div>
 
@@ -233,7 +238,7 @@ export default function CalendarScreen() {
                     <CheckSquare className="w-6 h-6 stroke-[1.5]" />
                   </div>
                   <p className="text-gray-500 dark:text-gray-400 font-sans text-sm font-medium">
-                    Нет записанных логов за этот день.
+                    {lang === 'en' ? 'No logs recorded for this day.' : 'Нет записанных логов за этот день.'}
                   </p>
                 </div>
               )}
@@ -244,14 +249,14 @@ export default function CalendarScreen() {
                   {logDetails && logDetails.metricsObj && (
                     <div className="flex flex-col gap-3">
                       <span className="font-sans text-xs text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold">
-                        Показатели дня
+                        {lang === 'en' ? 'Daily Metrics' : 'Показатели дня'}
                       </span>
                       <div className="flex flex-wrap gap-2.5">
                         {logDetails.metricsObj.mood > 0 && (
                           <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/20 px-3 py-1.5 rounded-full border border-blue-100/50 dark:border-blue-900/30">
                             <Smile className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                             <span className="text-xs text-blue-900 dark:text-blue-300 font-semibold">
-                              Настроение: {logDetails.metricsObj.mood}
+                              {t('mood', lang)}: {logDetails.metricsObj.mood}
                             </span>
                           </div>
                         )}
@@ -259,7 +264,7 @@ export default function CalendarScreen() {
                           <div className="flex items-center gap-1.5 bg-cyan-50 dark:bg-cyan-950/20 px-3 py-1.5 rounded-full border border-cyan-100/50 dark:border-cyan-900/30">
                             <Zap className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
                             <span className="text-xs text-cyan-900 dark:text-cyan-300 font-semibold">
-                              Энергия: {logDetails.metricsObj.energy}
+                              {t('energy', lang)}: {logDetails.metricsObj.energy}
                             </span>
                           </div>
                         )}
@@ -283,7 +288,7 @@ export default function CalendarScreen() {
                             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${stressColorClass}`}>
                               <AlertTriangle className={`w-3.5 h-3.5 ${stressIconClass}`} />
                               <span className={`text-xs font-semibold ${stressTextClass}`}>
-                                Стресс: {stress}
+                                {t('stress', lang)}: {stress}
                               </span>
                             </div>
                           );
@@ -292,7 +297,7 @@ export default function CalendarScreen() {
                           <div className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-1.5 rounded-full border border-indigo-100/50 dark:border-indigo-900/30">
                             <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                             <span className="text-xs text-indigo-900 dark:text-indigo-300 font-semibold">
-                              Продуктивность: {logDetails.metricsObj.productivity}
+                              {t('productivity', lang)}: {logDetails.metricsObj.productivity}
                             </span>
                           </div>
                         )}
@@ -303,7 +308,7 @@ export default function CalendarScreen() {
                   {logDetails && logDetails.conversation_log && (
                     <div className="flex flex-col gap-2">
                       <span className="font-sans text-xs text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold">
-                        📝 Твоя запись
+                        📝 {lang === 'en' ? 'Your Log' : 'Твоя запись'}
                       </span>
                       <div className="bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-4 border border-gray-100 dark:border-slate-800/50 max-h-64 overflow-y-auto">
                         <p className="font-sans text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-normal whitespace-pre-wrap">
@@ -320,7 +325,7 @@ export default function CalendarScreen() {
                       <div className="flex items-center gap-2 mb-3">
                         <Sparkles className="w-5 h-5 text-[#0058bc] dark:text-blue-400" />
                         <h4 className="font-sans font-bold text-[#00418f] dark:text-[#adc6ff] text-base">
-                          ✨ Итоги недели (AI Digest)
+                          ✨ {lang === 'en' ? 'Weekly Summary (AI Digest)' : 'Итоги недели (AI Digest)'}
                         </h4>
                       </div>
 

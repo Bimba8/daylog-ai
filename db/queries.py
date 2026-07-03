@@ -129,6 +129,17 @@ async def update_user_time(session: AsyncSession, tg_id: int, new_time: str) -> 
     return user
 
 
+async def update_user_language(session: AsyncSession, tg_id: int, lang: str) -> User:
+    """Обновить язык интерфейса. Допустимые значения: 'ru', 'en'."""
+    user, _ = await get_or_create_user(session, tg_id)
+    if user.language_code != lang:
+        user.language_code = lang
+        # Сбрасываем кэш инсайтов, чтобы теги сгенерировались на новом языке
+        user.cached_insights = None
+    await session.flush()
+    return user
+
+
 async def update_diary_metrics(session: AsyncSession, entry_id: int, metrics_json: str) -> None:
     """Обновить AI-метрики записи. Коммит — в middleware или явно в вызывающем коде."""
     stmt = update(DiaryEntry).where(DiaryEntry.id == entry_id).values(ai_metrics=metrics_json)

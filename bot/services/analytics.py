@@ -4,13 +4,14 @@ from aiogram import Bot
 from bot.services.ai import get_ai_metrics
 from bot.utils.telegram import safe_send
 from bot.keyboards.main_kb import get_main_kb
+from bot.lexicon.i18n import t
 from db.database import async_session
 from db.queries import update_diary_metrics
 
 logger = logger.bind(module="AI")
 
-async def generate_and_save_metrics(bot: Bot, chat_id: int, entry_id: int, user_text: str, loading_msg_id: int | None = None):
-    response = await get_ai_metrics(user_text)
+async def generate_and_save_metrics(bot: Bot, chat_id: int, entry_id: int, user_text: str, loading_msg_id: int | None = None, lang: str = "ru"):
+    response = await get_ai_metrics(user_text, lang=lang)
     
     if not response:
         logger.warning("ИИ не вернул валидные метрики")
@@ -46,7 +47,7 @@ async def generate_and_save_metrics(bot: Bot, chat_id: int, entry_id: int, user_
             avg_score = round((mood_score + energy_score + adjusted_stress + productivity_score) / 4, 1)
         
         
-        final_text = f"📊 Итоги дня: {avg_score} / 5\n\n📝 {summary_text}"
+        final_text = t('analytics_day_summary', lang).format(score=avg_score, summary=summary_text)
         
         # safe_send обрабатывает TelegramForbiddenError и rate limits
         # Если у нас есть ID заглушки, просто меняем её текст на итоги дня

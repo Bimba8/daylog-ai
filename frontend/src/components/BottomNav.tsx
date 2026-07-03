@@ -1,12 +1,14 @@
 import React from 'react';
 import { User, Calendar, LineChart } from 'lucide-react';
+import { t, Language } from '../i18n';
 
 interface BottomNavProps {
   activeTab: 'profile' | 'calendar' | 'analytics';
   onTabChange: (tab: 'profile' | 'calendar' | 'analytics') => void;
+  lang?: Language;
 }
 
-export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
+export default function BottomNav({ activeTab, onTabChange, lang = 'ru' }: BottomNavProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-t border-gray-200/30 dark:border-slate-800/30 pb-[env(safe-area-inset-bottom,16px)]">
       <div className="flex justify-around items-center h-16 w-full max-w-md mx-auto px-2">
@@ -28,7 +30,7 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
           >
             <User className="w-5 h-5 stroke-[2]" />
           </div>
-          <span className="text-[11px] font-semibold tracking-tight">Профиль</span>
+          <span className="text-[11px] font-semibold tracking-tight">{t('tab_profile', lang)}</span>
         </button>
 
         {/* Calendar Tab */}
@@ -49,7 +51,7 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
           >
             <Calendar className="w-5 h-5 stroke-[2]" />
           </div>
-          <span className="text-[11px] font-semibold tracking-tight">Календарь</span>
+          <span className="text-[11px] font-semibold tracking-tight">{t('tab_calendar', lang)}</span>
         </button>
 
         {/* Analytics Tab */}
@@ -70,7 +72,7 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
           >
             <LineChart className="w-5 h-5 stroke-[2]" />
           </div>
-          <span className="text-[11px] font-semibold tracking-tight">Аналитика</span>
+          <span className="text-[11px] font-semibold tracking-tight">{t('tab_analytics', lang)}</span>
         </button>
       </div>
     </nav>

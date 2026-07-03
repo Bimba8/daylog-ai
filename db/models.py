@@ -23,6 +23,7 @@ class User(Base):
     reminder_time: Mapped[str] = mapped_column(String, default="20:00")
     digest_day: Mapped[int] = mapped_column(Integer, default=0)
     digest_time: Mapped[int] = mapped_column(Integer, default=12)
+    language_code: Mapped[str] = mapped_column(String(5), default="ru")
     cached_insights: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     insights_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     

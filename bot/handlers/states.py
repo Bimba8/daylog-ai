@@ -15,5 +15,5 @@ class SettingState(StatesGroup):
     waiting_for_time = State()
     
 class OnboardingState(StatesGroup):
+    choosing_language = State()
     waiting_for_tz = State()
-    waiting_for_time = State()
