@@ -8,7 +8,7 @@ from bot.keyboards.main_kb import get_report_kb
 from bot.utils import safe_tz
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from bot.lexicon.ru import LEXICON_RU
+from bot.lexicon.i18n import t, all_values
 
 logger = logger.bind(module="HANDLER")
 
@@ -68,8 +68,8 @@ def calculate_stats(metric_entries: list, streak_entries: list, total_count: int
     }
     
 @router.message(Command("stats"))
-@router.message(F.text == LEXICON_RU['kb_stats'])
-async def show_stats(message: types.Message, session: AsyncSession):
+@router.message(F.text.in_(all_values('kb_stats')))
+async def show_stats(message: types.Message, session: AsyncSession, lang: str = "ru"):
     """Показать статистику юзера: средние метрики и стрик."""
     user, _ = await get_or_create_user(session, message.from_user.id)
     
@@ -81,15 +81,15 @@ async def show_stats(message: types.Message, session: AsyncSession):
     
     if not metric_entries:
         await message.answer(
-            text=LEXICON_RU['stats_empty'],
-            reply_markup=get_report_kb()
+            text=t('stats_empty', lang),
+            reply_markup=get_report_kb(lang)
         )
         return
     
     stats = calculate_stats(metric_entries, streak_entries, total_count, tz_str=user.timezone)
     avg = stats['averages']
     
-    response_text = LEXICON_RU['stats_report'].format(
+    response_text = t('stats_report', lang).format(
         total_count=stats['total_count'],
         streak=stats['streak'],
         mood=avg['mood'],

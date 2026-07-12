@@ -60,14 +60,14 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
-      - "8888:8080"
+      - "127.0.0.1:8888:8080"
 
   metabase:
       image: metabase/metabase:latest
       container_name: daylog_metabase
       restart: always
       ports:
-        - "3000:3000" # Открываем порт для веб-интерфейса
+        - "127.0.0.1:3000:3000"
       volumes:
         - metabase-data:/metabase.db
       environment:

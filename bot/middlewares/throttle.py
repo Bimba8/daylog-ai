@@ -7,15 +7,15 @@ Redis INCR + EXPIRE — атомарный счётчик с TTL.
 from typing import Any, Awaitable, Callable, Dict
 from loguru import logger
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, Message
+from aiogram.types import TelegramObject, Message, CallbackQuery
 from redis.asyncio import Redis
 from config import config
+from bot.lexicon.i18n import t
 
 _logger = logger.bind(module="THROTTLE")
 
 RATE_LIMIT = 5
 RATE_WINDOW = 10
-COOLDOWN_MSG = "⏳ <b>Слишком быстро!</b>\n\nПодожди пару секунд и попробуй снова."
 
 
 class ThrottleMiddleware(BaseMiddleware):
@@ -33,10 +33,15 @@ class ThrottleMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
-        if not isinstance(event, Message):
+        if isinstance(event, Message):
+            user_id = event.from_user.id if event.from_user else None
+            is_callback = False
+        elif isinstance(event, CallbackQuery):
+            user_id = event.from_user.id
+            is_callback = True
+        else:
             return await handler(event, data)
 
-        user_id = event.from_user.id if event.from_user else None
         if user_id is None:
             return await handler(event, data)
 
@@ -49,7 +54,11 @@ class ThrottleMiddleware(BaseMiddleware):
 
         if current > RATE_LIMIT:
             _logger.warning("Rate limit: user={}, count={}", user_id, current)
-            await event.answer(COOLDOWN_MSG)
+            lang = data.get("lang", "ru")
+            if is_callback:
+                await event.answer(t('common_throttle', lang), show_alert=True)
+            else:
+                await event.answer(t('common_throttle', lang))
             return
 
         return await handler(event, data)

@@ -21,6 +21,7 @@ from bot.services.scheduler import scheduler, schedule_daily_reminder, schedule_
 from bot.services.saver import cancel_background_tasks
 from bot.middlewares.throttle import ThrottleMiddleware
 from bot.middlewares.db import DbSessionMiddleware
+from bot.middlewares.i18n import I18nMiddleware
 from bot.logging_config import setup_logging
 
 setup_logging()
@@ -30,7 +31,7 @@ if config.SENTRY_DSN:
     sentry_sdk.init(
         dsn=config.SENTRY_DSN,
         integrations=[AsyncioIntegration()],
-        traces_sample_rate=1.0,
+        traces_sample_rate=0.1,
         environment="production"
     )
 
@@ -85,6 +86,7 @@ async def main():
     # Middleware: throttle ПЕРВЫМ (до открытия DB-сессии)
     dp.update.middleware(ThrottleMiddleware())
     dp.update.middleware(DbSessionMiddleware())
+    dp.update.middleware(I18nMiddleware())
     
     # Регистрация роутеров (порядок важен: common_router — catch-all, всегда последний)
     dp.include_router(start_router)

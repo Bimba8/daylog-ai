@@ -30,7 +30,8 @@ async def finalize_diary_entry(
     conversation_log: str | None = None,
     state: FSMContext = None, 
     session: AsyncSession = None,
-    loading_msg_id: int | None = None
+    loading_msg_id: int | None = None,
+    lang: str = "ru"
 ):
     """Финализация записи дневника: сохранение в БД + запуск фонового AI-анализа."""
     if session:
@@ -51,7 +52,7 @@ async def finalize_diary_entry(
         await state.clear()
         
     # AI-анализ в фоне — откроет собственную сессию в analytics.py
-    task = asyncio.create_task(generate_and_save_metrics(bot, chat_id, new_entry.id, text, loading_msg_id))
+    task = asyncio.create_task(generate_and_save_metrics(bot, chat_id, new_entry.id, text, loading_msg_id, lang=lang))
     _background_tasks.add(task)
     task.add_done_callback(_task_done_callback)
     

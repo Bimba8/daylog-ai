@@ -1,6 +1,7 @@
 # Секреты
 .env
 AGENTS.md
+notion_mcp.py
 
 # База данных (чтобы не пушить тестовые данные)
 *.db
@@ -26,5 +27,17 @@ __pycache__/
 
 files/
 daylog-ai-doc.md
+
 # Log files
 logs/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+frontend/*.local
+frontend/.eslintcache
+
+.agents 
+AGENTS.md

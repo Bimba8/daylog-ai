@@ -1,6 +1,7 @@
 # Секреты
 .env
 AGENTS.md
+notion_mcp.py
 
 # Git (история может содержать секреты)
 .git/
@@ -32,3 +33,6 @@ __pycache__/
 files/
 logs/
 *.md
+
+.agents 
+AGENTS.md

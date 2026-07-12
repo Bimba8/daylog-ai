@@ -9,54 +9,59 @@ from bot.services.scheduler import schedule_nudge, cancel_nudge, schedule_night_
 from bot.services.saver import finalize_diary_entry
 from bot.keyboards.main_kb import get_cancel_kb, get_main_kb, get_finish_diary_kb
 from bot.utils.telegram import safe_delete
-from bot.lexicon.ru import LEXICON_RU
+from bot.lexicon.i18n import t, all_values
     
 router = Router()
 
+# Стоп-слова для завершения записи (мультиязычные)
+_STOP_WORDS = {"пока", "bye", "done"}
+
 
 @router.message(Command("daylog"))
-@router.message(F.text == LEXICON_RU['kb_write_day'])
-async def cmd_daylog(message: types.Message, state: FSMContext, session: AsyncSession):
+@router.message(F.text.in_(all_values('kb_write_day')))
+async def cmd_daylog(message: types.Message, state: FSMContext, session: AsyncSession, lang: str = "ru"):
     """Начало записи дневника. Проверяет, не писал ли юзер сегодня."""
     user, _ = await get_or_create_user(session, message.from_user.id)
     already_wrote_today = await check_today_entry(session, message.from_user.id, user.timezone)
     
     if already_wrote_today:
-        await message.answer(LEXICON_RU['diary_already_wrote'])
+        await message.answer(t('diary_already_wrote', lang))
         return
     
     await state.set_state(DiaryState.waiting_for_story)
-    await state.update_data(user_tz=user.timezone)
+    await state.update_data(user_tz=user.timezone, lang=lang)
     await message.answer(
-        text=LEXICON_RU['diary_start_reflection'],
-        reply_markup=get_cancel_kb()
+        text=t('diary_start_reflection', lang),
+        reply_markup=get_cancel_kb(lang)
         )
      
 
 @router.message(DiaryState.waiting_for_story)
-async def process_story(message: types.Message, state: FSMContext, session: AsyncSession):
+async def process_story(message: types.Message, state: FSMContext, session: AsyncSession, lang: str = "ru"):
     """Обработка первого сообщения юзера (рассказ о дне)."""
+    data = await state.get_data()
+    lang = data.get("lang", lang)
+
     if not message.text:
-        await message.answer(LEXICON_RU['diary_text_only'])
+        await message.answer(t('diary_text_only', lang))
         return
     
     if len(message.text) > 1500:
         await message.answer(
-            LEXICON_RU['diary_story_too_long'].format(length=len(message.text))
+            t('diary_story_too_long', lang).format(length=len(message.text))
         )
         return
     
     # Processing lock: блокируем повторные сообщения, пока AI думает
-    data = await state.get_data()
     if data.get("ai_processing"):
-        await message.answer(LEXICON_RU['diary_ai_processing'])
+        await message.answer(t('diary_ai_processing', lang))
         return
     await state.update_data(ai_processing=True)
     
-    processing_msg = await message.answer(LEXICON_RU['diary_analyzing_day'])
+    processing_msg = await message.answer(t('diary_analyzing_day', lang))
     
     try:
-        ai_response = await get_ai_response(message.text)
+        ai_response = await get_ai_response(message.text, lang=lang)
     except SafetyBlockError:
         await state.update_data(ai_processing=False)
         await safe_delete(processing_msg)
@@ -68,11 +73,12 @@ async def process_story(message: types.Message, state: FSMContext, session: Asyn
             text=message.text,
             conversation_log=f"User: {message.text}", 
             state=state, 
-            session=session
+            session=session,
+            lang=lang
         )
         await message.answer(
-            LEXICON_RU['diary_safety_block'],
-            reply_markup=get_main_kb()
+            t('diary_safety_block', lang),
+            reply_markup=get_main_kb(lang)
         )
         return
     
@@ -87,11 +93,12 @@ async def process_story(message: types.Message, state: FSMContext, session: Asyn
             text=message.text,
             conversation_log=f"User: {message.text}",  
             state=state,
-            session=session
+            session=session,
+            lang=lang
         )
         await message.answer(
-            text=LEXICON_RU['diary_ai_down'],
-            reply_markup=get_main_kb()
+            text=t('diary_ai_down', lang),
+            reply_markup=get_main_kb(lang)
         )
         return
     
@@ -101,7 +108,7 @@ async def process_story(message: types.Message, state: FSMContext, session: Asyn
         
         await safe_delete(processing_msg)
         # Инлайн-кнопка «Завершить запись» под каждым ответом AI
-        await message.answer(ai_response, reply_markup=get_finish_diary_kb())
+        await message.answer(ai_response, reply_markup=get_finish_diary_kb(lang))
         
         schedule_nudge(
             bot=message.bot,
@@ -121,22 +128,24 @@ async def process_story(message: types.Message, state: FSMContext, session: Asyn
         )
 
 @router.message(DiaryState.waiting_for_answer)
-async def process_answer(message: types.Message, state: FSMContext, session: AsyncSession):
+async def process_answer(message: types.Message, state: FSMContext, session: AsyncSession, lang: str = "ru"):
     """Обработка ответов юзера в диалоге с AI (до 2 раундов)."""
+    data = await state.get_data()
+    lang = data.get("lang", lang)
+
     if not message.text:
-        await message.answer(LEXICON_RU['diary_text_only'])
+        await message.answer(t('diary_text_only', lang))
         return
     
     if len(message.text) > 800:
         await message.answer(
-            LEXICON_RU['diary_answer_too_long'].format(length=len(message.text))
+            t('diary_answer_too_long', lang).format(length=len(message.text))
         )
         return
     
     # Processing lock: блокируем повторные сообщения, пока AI думает
-    data = await state.get_data()
     if data.get("ai_processing"):
-        await message.answer(LEXICON_RU['diary_ai_processing'])
+        await message.answer(t('diary_ai_processing', lang))
         return
     
     cancel_nudge(message.from_user.id)
@@ -149,7 +158,7 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
     new_story = f"{story}\n\nAI: {last_ai_question}\n\nUser: {message.text}"
     new_user_text = f"{user_text}\n{message.text}"
     
-    if message.text.lower() == "пока":
+    if message.text.lower() in _STOP_WORDS:
         await finalize_diary_entry(
             bot=message.bot, 
             chat_id=message.chat.id, 
@@ -157,16 +166,17 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
             text=user_text,
             conversation_log=story, 
             state=state,
-            session=session
+            session=session,
+            lang=lang
         )
         await message.answer(
-            text=LEXICON_RU['diary_saved_bye'],
-            reply_markup=get_main_kb()
+            text=t('diary_saved_bye', lang),
+            reply_markup=get_main_kb(lang)
         )
         return
     
     elif turn_count >= 2:
-        loading_msg = await message.answer(LEXICON_RU['diary_finalizing'])
+        loading_msg = await message.answer(t('diary_finalizing', lang))
         await finalize_diary_entry(
             bot=message.bot, 
             chat_id=message.chat.id, 
@@ -175,16 +185,17 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
             conversation_log=new_story, 
             state=state,
             session=session,
-            loading_msg_id=loading_msg.message_id
+            loading_msg_id=loading_msg.message_id,
+            lang=lang
         )
         return
     
     else:
         await state.update_data(ai_processing=True)
-        processing_msg = await message.answer(LEXICON_RU['diary_analyzing_answer'])
+        processing_msg = await message.answer(t('diary_analyzing_answer', lang))
         
         try:
-            ai_response = await get_ai_response(new_story)
+            ai_response = await get_ai_response(new_story, lang=lang)
         except SafetyBlockError:
             await state.update_data(ai_processing=False)
             await safe_delete(processing_msg)
@@ -196,11 +207,12 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
                 text=new_user_text,
                 conversation_log=new_story, 
                 state=state, 
-                session=session
+                session=session,
+                lang=lang
             )
             await message.answer(
-                LEXICON_RU['diary_safety_block'],
-                reply_markup=get_main_kb()
+                t('diary_safety_block', lang),
+                reply_markup=get_main_kb(lang)
             )
             return
         
@@ -218,11 +230,12 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
                 text=new_user_text,
                 conversation_log=new_story, 
                 state=state,
-                session=session
+                session=session,
+                lang=lang
             )
             await message.answer(
-                text=LEXICON_RU['diary_ai_down'],
-                reply_markup=get_main_kb()
+                text=t('diary_ai_down', lang),
+                reply_markup=get_main_kb(lang)
             )
             return
         
@@ -235,7 +248,7 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
         )
         
         await safe_delete(processing_msg)
-        await message.answer(ai_response, reply_markup=get_finish_diary_kb())
+        await message.answer(ai_response, reply_markup=get_finish_diary_kb(lang))
         
         schedule_nudge(
             bot=message.bot,
@@ -255,24 +268,25 @@ async def process_answer(message: types.Message, state: FSMContext, session: Asy
 
 # Завершение диалога по инлайн-кнопке. Работает в обоих FSM-состояниях.
 @router.callback_query(F.data == "finish_diary")
-async def finish_diary_callback(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
+async def finish_diary_callback(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession, lang: str = "ru"):
     """Явное завершение записи через инлайн-кнопку."""
+    data = await state.get_data()
+    lang = data.get("lang", lang)
     current_state = await state.get_state()
     
     if current_state not in (DiaryState.waiting_for_story, DiaryState.waiting_for_answer):
-        await callback.answer(LEXICON_RU['diary_finish_already_done'])
+        await callback.answer(t('diary_finish_already_done', lang))
         return
     
     cancel_nudge(callback.from_user.id)
     cancel_night_cleaner(callback.from_user.id)
     
-    data = await state.get_data()
     story = data.get("story", "")
     user_text = data.get("user_text", "")
     
     if not user_text:
         await state.clear()
-        await callback.answer(LEXICON_RU['diary_finish_no_text'])
+        await callback.answer(t('diary_finish_no_text', lang))
         return
     
     # 1. Сначала гасим инлайн-кнопку, чтобы юзер не тыкал второй раз
@@ -280,7 +294,7 @@ async def finish_diary_callback(callback: types.CallbackQuery, state: FSMContext
     
     # 2. Отправляем заглушку И запоминаем её ID
     loading_msg = await callback.message.answer(
-        text=LEXICON_RU['diary_finalizing']
+        text=t('diary_finalizing', lang)
     )
     
     # 3. Переносим вызов finalize_diary_entry ниже и прокидываем ID
@@ -292,28 +306,30 @@ async def finish_diary_callback(callback: types.CallbackQuery, state: FSMContext
         conversation_log=story,
         state=state,
         session=session,
-        loading_msg_id=loading_msg.message_id  # <--- Передаем ID нашей заглушки
+        loading_msg_id=loading_msg.message_id,
+        lang=lang
     )
     
     await callback.answer()
 
 # Инициализация записи по напоминалке
 @router.callback_query(F.data == "write_report")
-async def report_from_reminder(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
+async def report_from_reminder(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession, lang: str = "ru"):
     """Начало записи через инлайн-кнопку (из напоминалки или меню)."""
     user, _ = await get_or_create_user(session, callback.from_user.id)
+    lang = user.language_code or lang
     
     already_wrote_today = await check_today_entry(session, callback.from_user.id, user.timezone)
     if already_wrote_today:
-        await callback.message.answer(LEXICON_RU['diary_already_wrote'])
+        await callback.message.answer(t('diary_already_wrote', lang))
         await callback.answer()
         return
     
     await state.set_state(DiaryState.waiting_for_story)
-    await state.update_data(user_tz=user.timezone)
+    await state.update_data(user_tz=user.timezone, lang=lang)
     await callback.message.delete() 
     await callback.message.answer(  
-        text=LEXICON_RU['diary_start_from_reminder'],
-        reply_markup=get_cancel_kb()
+        text=t('diary_start_from_reminder', lang),
+        reply_markup=get_cancel_kb(lang)
     )
     await callback.answer()

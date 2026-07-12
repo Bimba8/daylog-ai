@@ -3,6 +3,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Setting(BaseSettings):
     # Указываем, какие переменные мы ЖДЕМ из .env и их типы
     BOT_TOKEN: str
+    JWT_SECRET: str
+    WEBAPP_URL: str = ""
+    ADMIN_IDS: str = ""  # Comma-separated Telegram IDs for admin commands
     GROQ_API_KEY: str
     GEMINI_API_KEY: str
     DATABASE_URL: str

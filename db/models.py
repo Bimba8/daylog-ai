@@ -23,9 +23,13 @@ class User(Base):
     reminder_time: Mapped[str] = mapped_column(String, default="20:00")
     digest_day: Mapped[int] = mapped_column(Integer, default=0)
     digest_time: Mapped[int] = mapped_column(Integer, default=12)
+    language_code: Mapped[str] = mapped_column(String(5), default="ru")
+    cached_insights: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    insights_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Связь с записями дневника: user.entries вернет все DiaryEntry этого юзера
-    entries: Mapped[list["DiaryEntry"]] = relationship(back_populates="user", lazy="selectin")
+    entries: Mapped[list["DiaryEntry"]] = relationship(back_populates="user", lazy="noload")
+    digests: Mapped[list["WeeklyDigest"]] = relationship(back_populates="user", lazy="noload")
     
     
 class DiaryEntry(Base):
@@ -41,3 +45,13 @@ class DiaryEntry(Base):
     
     # Обратная связь: entry.user вернет объект User
     user: Mapped["User"] = relationship(back_populates="entries")
+    
+class WeeklyDigest(Base):
+    __tablename__ = 'weekly_digests'
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    content: Mapped[str] = mapped_column(Text)
+    
+    user: Mapped["User"] = relationship(back_populates="digests")

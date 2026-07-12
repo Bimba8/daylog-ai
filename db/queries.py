@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
 from sqlalchemy.exc import IntegrityError
 from bot.utils import safe_tz
-from db.models import User, DiaryEntry
+from db.models import User, DiaryEntry, WeeklyDigest
 
 
 async def get_user(session: AsyncSession, tg_id: int) -> User | None:
@@ -129,6 +129,17 @@ async def update_user_time(session: AsyncSession, tg_id: int, new_time: str) -> 
     return user
 
 
+async def update_user_language(session: AsyncSession, tg_id: int, lang: str) -> User:
+    """Обновить язык интерфейса. Допустимые значения: 'ru', 'en'."""
+    user, _ = await get_or_create_user(session, tg_id)
+    if user.language_code != lang:
+        user.language_code = lang
+        # Сбрасываем кэш инсайтов, чтобы теги сгенерировались на новом языке
+        user.cached_insights = None
+    await session.flush()
+    return user
+
+
 async def update_diary_metrics(session: AsyncSession, entry_id: int, metrics_json: str) -> None:
     """Обновить AI-метрики записи. Коммит — в middleware или явно в вызывающем коде."""
     stmt = update(DiaryEntry).where(DiaryEntry.id == entry_id).values(ai_metrics=metrics_json)
@@ -225,3 +236,59 @@ async def update_user_digest_time(session: AsyncSession, tg_id: int, time_idx: i
     user.digest_time = time_idx
     await session.flush()
     return user
+
+
+async def add_weekly_digest(session: AsyncSession, tg_id: int, content: str) -> WeeklyDigest:
+    user, _ = await get_or_create_user(session, tg_id)
+    new_entry = WeeklyDigest(
+        user_id=user.id,
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        content=content
+    )
+    session.add(new_entry)
+    await session.flush()
+    return new_entry
+
+
+async def get_user_digest(
+    session: AsyncSession,
+    tg_id: int,
+    order: str = "desc",
+    limit: int | None = None,
+) -> list[WeeklyDigest]:
+    
+    ordering = WeeklyDigest.created_at.desc() if order == "desc" else WeeklyDigest.created_at.asc()
+    
+    stmt = (
+        select(WeeklyDigest)
+        .join(User, WeeklyDigest.user_id == User.id)
+        .where(User.telegram_id == tg_id)
+        .order_by(ordering)
+    )
+    
+    if limit:
+        stmt = stmt.limit(limit)
+        
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
+async def get_entries_by_date_range(
+    session: AsyncSession,
+    tg_id: int,
+    start_date: datetime,
+    end_date: datetime
+) -> list[DiaryEntry]:
+    """Получить записи пользователя за конкретный период дат (в UTC)."""
+    
+    stmt = (
+        select(DiaryEntry)
+        .join(User, DiaryEntry.user_id == User.id)
+        .where(User.telegram_id == tg_id)
+        .where(DiaryEntry.created_at >= start_date)
+        .where(DiaryEntry.created_at < end_date)
+        .order_by(DiaryEntry.created_at.asc())
+    )
+    
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
