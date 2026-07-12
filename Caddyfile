@@ -1,13 +1,14 @@
-# Секретный поддомен для логов (поменяй my-secret-logs на свой набор букв/цифр)
-bimba-daylog-dozzle-logs.{$SERVER_DOMAIN} {
-    reverse_proxy dozzle:8080
-}
-
 {$SERVER_DOMAIN} {
     @api path /api/* /docs /openapi.json
     handle @api {
         reverse_proxy api:8000
     }
+
+    # Вот наше правило для логов (обрати внимание, просто handle, без _path)
+    handle /bimba-daylog-dozzle-logs* {
+        reverse_proxy dozzle:8080
+    }
+
     handle {
         reverse_proxy frontend:80
     }
