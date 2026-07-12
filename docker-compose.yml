@@ -78,7 +78,6 @@ services:
     image: caddy:alpine
     container_name: daylog_caddy
     restart: unless-stopped
-    command: --base /bimba-logs-secret   # <--- ДОБАВИТЬ ЭТУ СТРОКУ
     ports:
       - "80:80"
       - "443:443"
