@@ -66,6 +66,14 @@ services:
     networks:
       - backend
 
+  frontend:
+    build:
+      context: ./frontend
+    container_name: daylog_frontend
+    restart: unless-stopped
+    networks:
+      - backend
+
   caddy:
     image: caddy:alpine
     container_name: daylog_caddy
@@ -73,11 +81,11 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    # Caddy возьмет адрес из файла .env!
-    command: caddy reverse-proxy --from ${SERVER_DOMAIN} --to api:8000
+    environment:
+      - SERVER_DOMAIN=${SERVER_DOMAIN}
     volumes:
       - caddy_data:/data
-      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro   # <--- Подключаем конфиг
     networks:
       - backend
 
