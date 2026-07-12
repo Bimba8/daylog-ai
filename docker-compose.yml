@@ -99,6 +99,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "127.0.0.1:8888:8080"
+    networks:          # <--- ДОБАВИТЬ ВОТ ЭТО
+      - backend        # <--- И ВОТ ЭТО
 
   metabase:
       image: metabase/metabase:latest
