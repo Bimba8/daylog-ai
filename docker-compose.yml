@@ -53,6 +53,34 @@ services:
         limits:
           memory: 256M
   
+  api:
+    build: .
+    container_name: daylog_api
+    restart: unless-stopped
+    command: uvicorn api.app:app --host 0.0.0.0 --port 8000
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - backend
+
+  caddy:
+    image: caddy:alpine
+    container_name: daylog_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    # Caddy возьмет адрес из файла .env!
+    command: caddy reverse-proxy --from ${SERVER_DOMAIN} --to api:8000
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - backend
+
   dozzle:
     image: amir20/dozzle:latest
     container_name: daylog_dozzle
@@ -87,3 +115,5 @@ volumes:
   postgres_data:
   redis_data:
   metabase-data:
+  caddy_data:
+  caddy_config:
