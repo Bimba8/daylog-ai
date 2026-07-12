@@ -94,6 +94,8 @@ services:
     image: amir20/dozzle:latest
     container_name: daylog_dozzle
     restart: unless-stopped
+    environment:
+      - DOZZLE_BASE=/bimba-daylog-dozzle-logs  # <--- Передаем путь через переменную
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
