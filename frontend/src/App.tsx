@@ -6,7 +6,7 @@ import BottomNav from './components/BottomNav';
 import ProfileScreen from './screens/ProfileScreen';
 import CalendarScreen from './screens/CalendarScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
-import { apiClient } from './api/client'; 
+import { apiClient, setToken } from './api/client'; 
 import { t, Language } from './i18n';
 
 declare global {
@@ -184,7 +184,7 @@ export default function App() {
           method: 'POST', 
           body: JSON.stringify({ initData }) 
         });
-        localStorage.setItem('access_token', data.access_token);
+        setToken(data.access_token);
         const profile = await apiClient('/profile');
         setUserSettings({
           timezone: profile.timezone,
@@ -195,7 +195,7 @@ export default function App() {
         });
         setIsAuthLoading(false);
       } catch (error) {
-        console.error('Ошибка авторизации:', error);
+        if (import.meta.env.DEV) console.error('Ошибка авторизации:', error);
         setIsError(true);
         setIsAuthLoading(false);
       }
@@ -212,7 +212,7 @@ export default function App() {
         body: JSON.stringify({ [key]: value })
       });
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      if (import.meta.env.DEV) console.error('Ошибка сохранения:', error);
     }
   };
 

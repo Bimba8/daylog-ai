@@ -85,6 +85,7 @@ async def get_entries(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db)
 ):
+    limit = max(1, min(limit, 100))
     entries = await get_user_entries(session, user.telegram_id, limit)
     digests = await get_user_digest(session, user.telegram_id, limit=5)
     
@@ -92,16 +93,14 @@ async def get_entries(
     
     for entry in entries:
         formatted_items.append({
-            "id": entry.id,
             "created_at": entry.created_at,
-            "conversation_log": entry.conversation_log,
+            "user_text": entry.user_text,
             "metrics": entry.ai_metrics,
             "type": "log"
         })
         
     for digest in digests:
         formatted_items.append({
-            "id": digest.id,
             "created_at": digest.created_at,
             "content": digest.content,
             "type": "digest"

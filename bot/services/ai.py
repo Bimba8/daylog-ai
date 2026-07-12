@@ -161,9 +161,11 @@ async def get_ai_response(user_text: str, lang: str = "ru") -> str | None:
 
 async def get_ai_metrics(user_text: str, lang: str = "ru") -> dict | None:
     """Извлечение метрик настроения из текста. Groq 8B → Gemini flash."""
+    anti_injection = _ANTI_INJECTION_EN if lang == "en" else _ANTI_INJECTION_RU
     messages = [
         {"role": "system", "content": get_metrics_prompt(lang)},
-        {"role": "user", "content": user_text}
+        {"role": "user", "content": anti_injection},
+        {"role": "user", "content": f"### USER INPUT ###\n{user_text}\n### END OF USER INPUT ###"}
     ]
     
     raw_text = None
@@ -265,7 +267,7 @@ async def generate_weekly_digest(entries: list, lang: str = "ru") -> str | None:
     
     messages = [
         {"role": "system", "content": get_digest_prompt(lang)},
-        {"role": "user", "content": compiled_text}
+        {"role": "user", "content": f"### USER DIARY DATA ###\n{compiled_text}\n### END OF USER DIARY DATA ###"}
     ]
     
     try:
@@ -351,7 +353,7 @@ async def generate_user_insights(entries: list, lang: str = "ru") -> dict | None
         
     messages = [
         {"role": "system", "content": get_insights_prompt(lang)},
-        {"role": "user", "content": compiled_text}
+        {"role": "user", "content": f"### USER DIARY DATA ###\n{compiled_text}\n### END OF USER DIARY DATA ###"}
     ]
     
     try:

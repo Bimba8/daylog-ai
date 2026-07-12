@@ -31,7 +31,7 @@ if config.SENTRY_DSN:
     sentry_sdk.init(
         dsn=config.SENTRY_DSN,
         integrations=[AsyncioIntegration()],
-        traces_sample_rate=1.0,
+        traces_sample_rate=0.1,
         environment="production"
     )
 

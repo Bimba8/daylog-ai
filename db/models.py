@@ -28,8 +28,8 @@ class User(Base):
     insights_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Связь с записями дневника: user.entries вернет все DiaryEntry этого юзера
-    entries: Mapped[list["DiaryEntry"]] = relationship(back_populates="user", lazy="selectin")
-    digests: Mapped[list["WeeklyDigest"]] = relationship(back_populates="user", lazy="selectin")
+    entries: Mapped[list["DiaryEntry"]] = relationship(back_populates="user", lazy="noload")
+    digests: Mapped[list["WeeklyDigest"]] = relationship(back_populates="user", lazy="noload")
     
     
 class DiaryEntry(Base):

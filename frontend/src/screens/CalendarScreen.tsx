@@ -44,7 +44,7 @@ export default function CalendarScreen({ lang = 'ru' }: { lang?: Language }) {
                   if (item.metrics) {
                     parsedMetrics = typeof item.metrics === 'string' ? JSON.parse(item.metrics) : item.metrics;
                   }
-                } catch (e) { console.error('Ошибка парсинга метрик', e); }
+                } catch (e) { if (import.meta.env.DEV) console.error('Ошибка парсинга метрик', e); }
                 
                 newLogs[day] = { ...item, metricsObj: parsedMetrics };
               } else if (item.type === 'digest') {
@@ -57,7 +57,7 @@ export default function CalendarScreen({ lang = 'ru' }: { lang?: Language }) {
         setLogsMap(newLogs);
         setDigestsMap(newDigests);
       } catch (error) {
-        console.error('Ошибка загрузки календаря:', error);
+        if (import.meta.env.DEV) console.error('Ошибка загрузки календаря:', error);
       } finally {
         setIsLoading(false);
       }
@@ -305,14 +305,14 @@ export default function CalendarScreen({ lang = 'ru' }: { lang?: Language }) {
                     </div>
                   )}
 
-                  {logDetails && logDetails.conversation_log && (
+                  {logDetails && logDetails.user_text && (
                     <div className="flex flex-col gap-2">
                       <span className="font-sans text-xs text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold">
                         📝 {lang === 'en' ? 'Your Log' : 'Твоя запись'}
                       </span>
                       <div className="bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-4 border border-gray-100 dark:border-slate-800/50 max-h-64 overflow-y-auto">
                         <p className="font-sans text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-normal whitespace-pre-wrap">
-                          {logDetails.conversation_log}
+                          {logDetails.user_text}
                         </p>
                       </div>
                     </div>

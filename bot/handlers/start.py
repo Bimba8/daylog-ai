@@ -50,6 +50,9 @@ async def handle_start(message: types.Message, state: FSMContext, session: Async
 @router.callback_query(OnboardingState.choosing_language, F.data.startswith("lang_"))
 async def onboarding_language_selected(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
     lang = callback.data.split("_")[1]  # "ru" или "en"
+    if lang not in ("ru", "en"):
+        await callback.answer(t('start_invalid_data', "ru"))
+        return
     await update_user_language(session, callback.from_user.id, lang)
     await state.update_data(lang=lang)
 
@@ -80,6 +83,9 @@ async def start_onboarding(callback: types.CallbackQuery, state: FSMContext, lan
 @router.callback_query(OnboardingState.waiting_for_tz, F.data.startswith("tz_"))
 async def onboarding_tz_selected(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession, lang: str = "ru"):
     selected_tz = callback.data[3:]
+    if selected_tz not in ru_timezones:
+        await callback.answer(t('start_invalid_data', lang))
+        return
     data = await state.get_data()
     lang = data.get("lang", lang)
     
@@ -136,6 +142,9 @@ async def start_tz_selection(callback: types.CallbackQuery, state: FSMContext, l
 @router.callback_query(SettingState.waiting_for_tz, F.data.startswith("tz_"))
 async def tz_selection_final(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession, lang: str = "ru"):
     selected_tz = callback.data[3:]
+    if selected_tz not in ru_timezones:
+        await callback.answer(t('start_invalid_data', lang))
+        return
     
     friendly_name = get_tz_friendly_name(selected_tz, lang)
     

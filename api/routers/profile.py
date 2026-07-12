@@ -1,8 +1,26 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+import re
 from api.deps import get_current_user, get_db
 from db.models import User
+
+# Whitelist допустимых IANA-таймзон (из bot/keyboards/main_kb.py)
+_VALID_TIMEZONES = {
+    "Europe/Kaliningrad", "Europe/Moscow", "Europe/Samara",
+    "Asia/Yekaterinburg", "Asia/Omsk", "Asia/Krasnoyarsk",
+    "Asia/Irkutsk", "Asia/Yakutsk", "Asia/Vladivostok",
+    "Asia/Magadan", "Asia/Kamchatka",
+    # UTC offsets for EN locale
+    "Etc/GMT+12", "Etc/GMT+11", "Etc/GMT+10", "Etc/GMT+9", "Etc/GMT+8",
+    "Etc/GMT+7", "Etc/GMT+6", "Etc/GMT+5", "Etc/GMT+4", "Etc/GMT+3",
+    "Etc/GMT+2", "Etc/GMT+1", "UTC",
+    "Etc/GMT-1", "Etc/GMT-2", "Etc/GMT-3", "Etc/GMT-4", "Etc/GMT-5",
+    "Etc/GMT-6", "Etc/GMT-7", "Etc/GMT-8", "Etc/GMT-9", "Etc/GMT-10",
+    "Etc/GMT-11", "Etc/GMT-12", "Etc/GMT-13", "Etc/GMT-14",
+}
+
+_TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 
@@ -25,6 +43,34 @@ class SettingsUpdate(BaseModel):
     digest_day: int | None = None
     digest_time: int | None = None
     language_code: str | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v):
+        if v is not None and v not in _VALID_TIMEZONES:
+            raise ValueError(f"Invalid timezone: {v}")
+        return v
+    
+    @field_validator("reminder_time")
+    @classmethod
+    def validate_reminder_time(cls, v):
+        if v is not None and not _TIME_PATTERN.match(v):
+            raise ValueError("Time must be in HH:MM format (00:00–23:59)")
+        return v
+    
+    @field_validator("digest_day")
+    @classmethod
+    def validate_digest_day(cls, v):
+        if v is not None and not (0 <= v <= 6):
+            raise ValueError("digest_day must be 0–6 (Mon–Sun)")
+        return v
+    
+    @field_validator("digest_time")
+    @classmethod
+    def validate_digest_time(cls, v):
+        if v is not None and not (0 <= v <= 23):
+            raise ValueError("digest_time must be 0–23")
+        return v
     
     
 @router.post("/settings")

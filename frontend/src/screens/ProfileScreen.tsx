@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Smile, Calendar, CheckCircle2 } from 'lucide-react';
+import { BookOpen, Smile, Calendar, CheckCircle2, User } from 'lucide-react';
 import { apiClient } from '../api/client';
 import EmptyState from '../components/EmptyState';
 
@@ -35,7 +35,7 @@ export default function ProfileScreen({ lang = 'ru' }: { lang?: Language }) {
         setUser(userData);
         setStats(statsData);
       } catch (error) {
-        console.error('Ошибка загрузки профиля:', error);
+        if (import.meta.env.DEV) console.error('Ошибка загрузки профиля:', error);
       } finally {
         setIsLoading(false);
       }
@@ -99,11 +99,17 @@ export default function ProfileScreen({ lang = 'ru' }: { lang?: Language }) {
       {/* Profile Header Block */}
       <div className="flex flex-col items-center mt-3 mb-2">
         <div className="relative w-24 h-24 mb-3">
-          <img
-            alt={user?.first_name || 'Аватар'}
-            className="w-full h-full rounded-full border-2 border-white dark:border-slate-800 object-cover shadow-md"
-            src={window.Telegram?.WebApp?.initDataUnsafe?.user?.photo_url || "https://t3.ftcdn.net/jpg/05/16/27/58/360_F_516275801_f3Fsp17x6HQK0xQgDQEELoTuERO4SsWV.jpg"}
-          />
+          {window.Telegram?.WebApp?.initDataUnsafe?.user?.photo_url ? (
+            <img
+              alt={user?.first_name || 'Аватар'}
+              className="w-full h-full rounded-full border-2 border-white dark:border-slate-800 object-cover shadow-md"
+              src={window.Telegram.WebApp.initDataUnsafe.user.photo_url}
+            />
+          ) : (
+            <div className="w-full h-full rounded-full border-2 border-white dark:border-slate-800 bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-gray-400 dark:text-gray-500 shadow-md">
+              <User className="w-10 h-10" />
+            </div>
+          )}
           <div className="absolute bottom-0 right-0 bg-[#00418f] text-white w-6 h-6 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center shadow-xs">
             <CheckCircle2 className="w-3.5 h-3.5 fill-[#00418f] stroke-[2.5]" />
           </div>

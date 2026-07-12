@@ -5,6 +5,8 @@ from api.routers.auth import router as auth_router
 from api.routers.profile import router as profile_router
 from api.routers.stats import router as stats_router
 from bot.services.ai import ai_router
+from api.rate_limiter import APIRateLimitMiddleware
+from config import config
 
 
 @asynccontextmanager
@@ -13,13 +15,20 @@ async def lifespan(app: FastAPI):
     yield
     await ai_router.close()
 
-app = FastAPI(title="DayLog API", lifespan=lifespan)
+_allowed_origins = [o.strip() for o in config.WEBAPP_URL.split(",") if o.strip()] if config.WEBAPP_URL else []
+
+app = FastAPI(title="DayLog API", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+
+# Rate Limiter (Redis-based) — регистрируется ДО CORS,
+# чтобы выполняться ПОСЛЕ CORS в стеке middleware Starlette
+app.add_middleware(APIRateLimitMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # НАДО ВСТАВИТЬ АКТУАЛЬНЫЙ ДОМЕН ФРОНТЕНДА 
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
+    allow_methods=["GET", "POST", "PUT", "PATCH"],
+    allow_headers=["Authorization", "Content-Type"]
 )
 
 app.include_router(auth_router, prefix="/api")

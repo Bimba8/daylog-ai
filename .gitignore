@@ -38,3 +38,6 @@ frontend/dist-ssr/
 frontend/.vite/
 frontend/*.local
 frontend/.eslintcache
+
+.agents 
+AGENTS.md

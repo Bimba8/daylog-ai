@@ -21,7 +21,7 @@ export default function AnalyticsScreen({ lang = 'ru' }: { lang?: Language }) {
         const data = await apiClient(`/stats/analytics?period=${timePeriod}`);
         setAnalyticsData(data);
       } catch (error) {
-        console.error('Ошибка загрузки аналитики:', error);
+        if (import.meta.env.DEV) console.error('Ошибка загрузки аналитики:', error);
       } finally {
         setIsLoading(false);
       }

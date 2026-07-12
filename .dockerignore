@@ -33,3 +33,6 @@ __pycache__/
 files/
 logs/
 *.md
+
+.agents 
+AGENTS.md
