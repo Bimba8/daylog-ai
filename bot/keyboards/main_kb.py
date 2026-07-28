@@ -47,6 +47,9 @@ _tz_keys_en = [
     ("UTC+14:00", "Etc/GMT-14"),
 ]
 
+# Единый список всех валидных таймзон для проверки (и русских, и английских)
+valid_timezones = set([tz for _, tz in _tz_keys] + [tz for _, tz in _tz_keys_en])
+
 # Обратный маппинг: IANA → friendly name (для обоих языков)
 def get_tz_friendly_name(iana_tz: str, lang: str = "ru") -> str:
     """Получить человекочитаемое имя таймзоны по IANA-коду."""
@@ -59,10 +62,6 @@ def get_tz_friendly_name(iana_tz: str, lang: str = "ru") -> str:
         if tz_str == iana_tz:
             return t(lex_key, lang)
     return iana_tz
-
-# Legacy-совместимость: ru_timezones используется в start.py для маппинга friendly → IANA
-ru_timezones = {t(lex_key, "ru"): tz_str for lex_key, tz_str in _tz_keys}
-
 
 def get_main_kb(lang: str = "ru") -> ReplyKeyboardMarkup:
     kb = [

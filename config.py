@@ -8,6 +8,7 @@ class Setting(BaseSettings):
     ADMIN_IDS: str = ""  # Comma-separated Telegram IDs for admin commands
     GROQ_API_KEY: str
     GEMINI_API_KEY: str
+    MISTRAL_API_KEY: str
     DATABASE_URL: str
     DB_ECHO: bool = False
     REDIS_URL: str

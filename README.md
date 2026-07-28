@@ -1,9 +1,11 @@
-# 🧠 Daylog AI
+# 🧠 DayLog AI
 
-> **Умный Telegram-бот для личного дневника на базе ИИ**
-> Пишешь как думаешь — бот структурирует, анализирует и возвращает тебе картину твоей жизни.
+> **Умный Telegram-бот и Mini App для личного дневника на базе ИИ**
+> Пишешь как думаешь — бот структурирует, анализирует и возвращает тебе картину твоей жизни через наглядные графики и инсайты.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-Mini%20App-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![aiogram](https://img.shields.io/badge/aiogram-3.x-009EFF?style=flat-square)](https://aiogram.dev)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-async-336791?style=flat-square&logo=postgresql&logoColor=white)](https://postgresql.org)
 [![Redis](https://img.shields.io/badge/Redis-FSM%20%2F%20Cache-DC382D?style=flat-square&logo=redis&logoColor=white)](https://redis.io)
@@ -12,12 +14,11 @@
 
 ---
 
-## О проекте
+## 📖 О проекте
 
-**Daylog AI** — это Telegram-бот, который превращает ежедневный поток мыслей в структурированный личный дневник.
-Пользователь пишет о своём дне в свободной форме. ИИ задаёт уточняющие вопросы в духе коучинга, извлекает метрики из текста (настроение, продуктивность, энергия, стресс) и в конце недели присылает структурированный дайджест с паттернами и инсайтами.
+**DayLog AI** — это экосистема из Telegram-бота и полноценного Telegram Mini App, которая превращает ежедневный поток мыслей в структурированный личный дневник и аналитику жизни.
 
-**Цель** — минимум усилий от пользователя, максимум рефлексии. Никаких форм и трекеров. Просто разговор.
+Вам не нужно заполнять трекеры или отвечать на скучные формы. Вы просто рассказываете боту о своём дне в свободной форме. ИИ задаёт уточняющие коучинговые вопросы, автоматически извлекает скрытые метрики (настроение, продуктивность, энергию, стресс) и строит наглядный дашборд. В конце недели вы получаете AI-дайджест с паттернами вашего поведения и инсайтами.
 
 ---
 
@@ -25,216 +26,144 @@
 
 | Функция | Описание |
 |---|---|
-| **FSM-диалог** | Многошаговый диалог записи дня с поддержкой до 2 раундов уточняющих вопросов от ИИ |
-| **AI-коучинг** | Контекстные вопросы на основе текста пользователя, направленные на углублённую рефлексию |
-| **Парсинг метрик** | Автоматическое извлечение оценок настроения, энергии, стресса и продуктивности из свободного текста |
-| **Еженедельный дайджест** | Структурированный AI-анализ недели: паттерны, тренды, повторяющиеся темы |
-| **Push-напоминания** | Ежедневные вечерние нотификации через `apscheduler` |
-| **Каскадный фоллбэк** | Автоматическое переключение между AI-провайдерами при недоступности одного из них |
-| **Защита от Prompt Injection** | Санитизация пользовательского ввода на уровне системного промпта |
-| **Мониторинг** | Sentry для трассировки async-ошибок, Langfuse для LLM-аналитики |
+| **Telegram Mini App** | Полноценный React-фронтенд прямо внутри Telegram. Дашборд с метриками, календарь активности (heatmap) и просмотр истории записей. |
+| **FSM-диалог** | Многошаговый диалог записи дня с поддержкой до 2 раундов уточняющих вопросов от ИИ. |
+| **AI-коучинг** | Контекстные вопросы на основе текста пользователя, направленные на углублённую рефлексию. |
+| **Парсинг метрик** | Автоматическое извлечение оценок (1-5) для настроения, энергии, стресса и продуктивности из свободного текста. |
+| **Бесшовная авторизация** | Безопасная JWT-авторизация в Mini App на основе валидации `initData` Telegram. Никаких паролей. |
+| **Еженедельный дайджест** | Структурированный AI-анализ недели: паттерны, тренды, повторяющиеся темы. |
+| **Каскадный фоллбэк** | Автоматическое переключение между AI-провайдерами (Groq → Gemini) при недоступности одного из них. |
+| **Безопасность (AppSec)** | Глубоко проаудированный код. Строгий Rate Limiting (Redis), защита от Prompt Injection во всех AI-ручках, CSP-заголовки, in-memory JWT, валидация полей через Pydantic. |
+| **i18n (Локализация)** | Поддержка русского (`ru`) и английского (`en`) языков. Контекстные таймзоны UTC для разных регионов. |
 
 ---
 
 ## 🛠 Технический стек
 
-### Ядро
-| Компонент | Технология |
-|---|---|
-| Язык | Python 3.11+ |
-| Фреймворк бота | aiogram 3.x |
-| FSM / Кеш | Redis (через `RedisStorage`) |
-| ORM | SQLAlchemy (async) + asyncpg |
-| База данных | PostgreSQL |
-| Миграции | Alembic |
-| Валидация конфига | pydantic-settings (`.env`) |
+### Бэкенд и Бот (Python 3.11+)
+* **Фреймворки:** `aiogram 3.x` (Telegram Bot API), `FastAPI` (REST API для Mini App)
+* **База данных:** PostgreSQL + `asyncpg` + `SQLAlchemy` (async ORM)
+* **Миграции:** Alembic
+* **Кэш и Rate Limit:** Redis
+* **Фоновые задачи:** `apscheduler` (пуши, дайджесты)
+* **Валидация конфигурации:** `pydantic-settings`
+
+### Фронтенд (Telegram Mini App)
+* **Core:** React 19, TypeScript, Vite
+* **UI/Стилизация:** Tailwind CSS v4, Lucide React (иконки), framer-motion (анимации)
+* **API Client:** Нативный fetch с перехватом 401 и строгим in-memory хранением токенов.
 
 ### ИИ и аналитика
-| Компонент | Технология |
-|---|---|
-| LLM-провайдер #1 | **Groq** (LLaMA-3) — основной, приоритетный |
-| LLM-провайдер #2 | **Google Gemini** (Flash-Lite) — фоллбэк |
-| HTTP-клиент | `aiohttp` — прямые запросы к API провайдеров |
-| LLM-трассировка | **Langfuse** — аналитика промптов и латентности |
+* **LLM #1 (Primary):** Groq (LLaMA-3)
+* **LLM #2 (Fallback):** Google Gemini (Flash)
+* **Трассировка:** Langfuse (аналитика промптов, latency, costs)
+* **BI:** Metabase (внутренний дашборд для продуктовой аналитики)
 
-### Инфраструктура
-| Компонент | Технология |
-|---|---|
-| Фоновые задачи | `apscheduler` — напоминания, дайджесты |
-| Логирование | `loguru` |
-| Мониторинг ошибок | **Sentry** — отлов необработанных async-исключений |
-| Контейнеризация | Docker + docker-compose |
+### Инфраструктура и Мониторинг
+* **Логирование:** `loguru`
+* **Сбор ошибок:** Sentry (асинхронный отлов с семплированием `0.1` в проде)
+* **Контейнеризация:** Docker + `docker-compose`
 
 ---
 
 ## 🏗 Архитектура проекта
 
-```
+```text
 daylog-ai/
+├── api/                        # FastAPI бэкенд
+│   ├── routers/                # Эндпоинты (auth, profile, stats)
+│   ├── app.py                  # Конфигурация FastAPI и middlewares
+│   └── security.py             # Валидация initData Telegram и выдача JWT
 │
-├── alembic/                    # Миграции базы данных
-│   └── versions/               # История ревизий схемы
+├── bot/                        # Telegram-бот (aiogram)
+│   ├── handlers/               # Роутеры (start, diary, stats, common)
+│   ├── middlewares/            # Redis Throttle, DB session, i18n
+│   └── services/               # Бизнес-логика: AI, планировщик (scheduler), saver
 │
-├── assets/                     # Статические файлы (онбординг-изображения)
+├── frontend/                   # Telegram Mini App (React + Vite)
+│   ├── src/
+│   │   ├── api/                # API-клиент с In-Memory JWT
+│   │   ├── components/         # UI-компоненты (Header, EmptyState)
+│   │   ├── screens/            # Экраны (Profile, Calendar, Analytics)
+│   │   └── i18n/               # Локализация фронтенда
 │
-├── bot/                        # Основной пакет бота
-│   ├── handlers/               # Роутеры событий aiogram
-│   │   ├── start.py            # /start, онбординг, регистрация пользователя
-│   │   ├── diary.py            # FSM-диалог: запись дня + AI-коучинг
-│   │   ├── history.py          # Просмотр последних записей
-│   │   ├── stats.py            # Личная статистика (streak, метрики)
-│   │   ├── info.py             # /help, информационные команды
-│   │   ├── common.py           # Общие хендлеры (отмена, fallback)
-│   │   └── states.py           # FSM-состояния (DiaryStates)
-│   │
-│   ├── keyboards/
-│   │   └── main_kb.py          # Основные inline и reply-клавиатуры
-│   │
-│   ├── lexicon/                # Тексты сообщений (централизованный i18n-готовый слой)
-│   │
-│   ├── middlewares/
-│   │   ├── throttle.py         # ThrottleMiddleware — защита от флуда
-│   │   └── db.py               # DbSessionMiddleware — инжект async-сессии в хендлеры
-│   │
-│   ├── services/               # Бизнес-логика (без зависимости от Telegram)
-│   │   ├── ai.py               # Каскадные LLM-запросы: Groq → Gemini fallback
-│   │   ├── prompts.py          # Все системные промпты (централизованно)
-│   │   ├── scheduler.py        # Планировщик: напоминания, еженедельные дайджесты
-│   │   ├── saver.py            # Логика сохранения записи + парсинг метрик
-│   │   └── analytics.py        # Агрегация статистики пользователя
-│   │
-│   ├── utils/
-│   │   └── telegram.py         # Хелперы для работы с Telegram API
-│   │
-│   └── logging_config.py       # Настройка loguru + Sentry integration
+├── db/                         # Работа с базой данных
+│   ├── database.py             # Async engine & session
+│   ├── models.py               # SQLAlchemy модели (User, DiaryEntry)
+│   └── queries.py              # CRUD операции
 │
-├── db/
-│   ├── database.py             # Создание async engine и sessionmaker
-│   ├── models.py               # SQLAlchemy-модели: User, DiaryEntry
-│   └── queries.py              # Все CRUD-операции (без raw SQL)
-│
-├── config.py                   # Pydantic-settings: загрузка и валидация .env
-├── main.py                     # Точка входа: регистрация роутеров, middlewares, polling
-│
-├── Dockerfile                  # Production-образ бота
-├── docker-compose.yml          # Production: bot + postgres + redis
-├── docker-compose-dev.yml      # Dev: только инфраструктура (postgres + redis)
-├── alembic.ini                 # Конфигурация Alembic
-├── requirements.txt
-└── .env.example                # Шаблон переменных окружения
+├── config.py                   # Pydantic настройки (загрузка из .env)
+├── main.py                     # Точка входа бота (polling + scheduler)
+├── Dockerfile                  # Production-образ Python (bot + api)
+└── docker-compose.yml          # Оркестрация: app, postgres, redis, metabase, dozzle
 ```
 
-### Потоки данных
-
-```
-Пользователь
-    │
-    ▼ Telegram Update
-[aiogram Dispatcher]
-    │
-    ├─ [ThrottleMiddleware]      ← Защита от флуда (Redis)
-    ├─ [DbSessionMiddleware]     ← Инжект async-сессии из пула
-    │
-    ▼
-[Handler: diary.py / FSM]
-    │
-    ├─ services/ai.py           ← Запрос к Groq (LLaMA-3)
-    │       └─ fallback ──────► Google Gemini Flash-Lite
-    │
-    ├─ services/saver.py        ← Парсинг метрик + запись в PostgreSQL
-    │
-    └─ Ответ пользователю
-    
-[apscheduler]
-    ├─ ежедневно  → push-напоминания всем активным пользователям
-    └─ еженедельно → AI-дайджест на основе записей за неделю
-```
+### 🔒 Архитектура безопасности (AppSec)
+DayLog AI построен с фокусом на безопасность пользовательских данных (особенно личных дневников):
+1. **API:** CORS строго привязан к домену WebApp. JWT выдается только после криптографической проверки `initData` от серверов Telegram и проверки наличия юзера в БД (защита от ghost-сессий).
+2. **Frontend:** Полный отказ от `localStorage` для хранения токенов. Токены хранятся исключительно in-memory, что нивелирует риски кражи сессии при XSS. Строгий `Content-Security-Policy`.
+3. **Database:** Защита от N+1 и OOM через отказ от `lazy="selectin"` в пользу точечных загрузок. Raw SQL отсутствует.
+4. **LLM:** Защита от Prompt Injection во всех AI-функциях (`generate_insights`, `get_metrics` и др.) с помощью системных разделителей `### USER INPUT ###` и пре-инструкций.
 
 ---
 
-## ⚙️ Запуск
+## ⚙️ Развертывание
 
 ### Требования
 - Docker & Docker Compose v2+
 - Заполненный файл `.env` (см. `.env.example`)
 
-### 1. Клонировать и настроить окружение
-
+### 1. Подготовка
 ```bash
 git clone https://github.com/your-repo/daylog-ai.git
 cd daylog-ai
 cp .env.example .env
-# Заполнить .env: токены Telegram, Groq, Gemini, Sentry, Langfuse, пароли DB и Redis
+# Обязательно заполните: токены Telegram, Groq, Gemini, Sentry, Langfuse, пароли DB/Redis/Metabase, а также JWT_SECRET.
 ```
 
-### 2. Применить миграции БД
-
+### 2. Запуск инфраструктуры разработки
 ```bash
-# Запустить только инфраструктуру
+# Поднимает БД и Redis (привязка к 127.0.0.1)
 docker compose -f docker-compose-dev.yml up -d
 
-# Применить миграции
-docker compose run --rm bot alembic upgrade head
+# Применение миграций схемы
+alembic upgrade head
 ```
 
-### 3. Запустить в продакшне
-
+### 3. Запуск в Production
 ```bash
+# Поднимает всё: Бота, API (через отдельный процесс), Postgres, Redis, Metabase
 docker compose up -d --build
 ```
 
-### Переменные окружения
-
-| Переменная | Обязательная | Описание |
-|---|---|---|
-| `BOT_TOKEN` | ✅ | Telegram Bot Token от @BotFather |
-| `GROQ_API_KEY` | ✅ | API-ключ Groq (основной LLM-провайдер) |
-| `GEMINI_API_KEY` | ✅ | API-ключ Google Gemini (фоллбэк) |
-| `DATABASE_URL` | ✅ | asyncpg connection string к PostgreSQL |
-| `REDIS_URL` | ✅ | Redis connection string (FSM + throttle) |
-| `SENTRY_DSN` | ⚪ | DSN для отправки ошибок в Sentry |
-| `LANGFUSE_PUBLIC_KEY` | ⚪ | Публичный ключ Langfuse для LLM-трассировки |
-| `LANGFUSE_SECRET_KEY` | ⚪ | Секретный ключ Langfuse |
-| `DB_ECHO` | ⚪ | Логировать SQL-запросы (`False` по умолчанию) |
-| `LOG_LEVEL` | ⚪ | Уровень логирования (`INFO` по умолчанию) |
+### Переменные окружения (`.env`)
+Обязательные:
+* `BOT_TOKEN` — токен бота от @BotFather.
+* `JWT_SECRET` — секретный ключ (64+ символов) для подписи токенов Mini App.
+* `WEBAPP_URL` — публичный URL фронтенда (для CORS).
+* `GROQ_API_KEY`, `GEMINI_API_KEY` — ключи провайдеров.
+* `DATABASE_URL`, `REDIS_URL` — строки подключения.
+* `ADMIN_IDS` — ID администраторов через запятую (для скрытых команд).
 
 ---
 
-## 🗺 Вектор развития
+## 🗺 Вектор развития (Roadmap)
 
-### 🔄 В работе
+### 🚀 Завершено (Release 1.0)
+- [x] Полноценный Telegram Mini App (React) с бесшовной авторизацией.
+- [x] FastAPI-бэкенд для обслуживания Mini App.
+- [x] Автоматический парсинг 4 метрик настроения и продуктивности.
+- [x] Глобальный аудит безопасности (Rate limiting, CORS, JWT in-memory).
+- [x] Двуязычность (Русский / Английский).
 
-- **Telegram Mini App** — пользовательский дашборд: профиль, аналитика метрик, графики настроения/продуктивности
-- **Инфраструктура аналитики** — Metabase для product BI + расширение Langfuse-трассировки
-- **Оптимизация хранилища** — разделение `conversation_log` и `user_text` в `DiaryEntry` для точного парсинга метрик
-
-### 📋 Бэклог
-
-**Backend & API**
-- FastAPI-бэкенд как API-слой для Mini App
-- Бесшовная авторизация Telegram Web App (без пароля)
-- Индексация PostgreSQL под запросы Mini App
-
-**Frontend**
-- React-фронтенд с data fetching из FastAPI
-- Дашборд с временными рядами метрик
-
-**ИИ и обработка**
-- Поддержка голосовых сообщений (Whisper / STT → дневник)
-- Умный роутинг LLM-запросов через LiteLLM
-- Контекст предыдущих записей в промптах (персонализация)
-
-**Инфраструктура и безопасность**
-- Перевод сервера на SSH-ключи (отказ от парольной аутентификации)
-- Principle of Least Privilege для DB-пользователей
-
-**Продукт**
-- Английская локализация (i18n)
-- Экспорт данных пользователя (GDPR-совместимость)
-- Бот-парсер крипто-донатов (real-time tracker)
+### 🔄 В работе & Бэклог
+- **Voice to Diary:** Поддержка голосовых сообщений (Whisper / STT).
+- **Умный AI-Контекст:** Инжект предыдущих записей в промпты для глубокой персонализации ответов ИИ.
+- **Smart Routing:** Переход на LiteLLM для балансировки AI-запросов.
+- **Экспорт данных:** Выгрузка всего дневника в PDF/Markdown для пользователя.
 
 ---
 
 ## 📄 Лицензия
 
-Проект разрабатывается в закрытом приватном репозитории. Все права защищены.
+Проект разрабатывается в приватном репозитории. Все права защищены.

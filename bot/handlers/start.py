@@ -10,7 +10,7 @@ from db.queries import get_or_create_user, update_user_timezone, update_user_tim
 from bot.keyboards.main_kb import (
     get_main_kb, get_settings_menu_kb, get_timezone_kb, get_onboarding_start_kb,
     get_report_kb, get_digest_day_kb, get_digest_time_kb,
-    get_digest_settings_menu_kb, get_language_kb, get_tz_friendly_name, ru_timezones,
+    get_digest_settings_menu_kb, get_language_kb, get_tz_friendly_name, valid_timezones
 )
 from bot.handlers.states import SettingState, OnboardingState
 from bot.services.scheduler import schedule_daily_reminder
@@ -83,7 +83,7 @@ async def start_onboarding(callback: types.CallbackQuery, state: FSMContext, lan
 @router.callback_query(OnboardingState.waiting_for_tz, F.data.startswith("tz_"))
 async def onboarding_tz_selected(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession, lang: str = "ru"):
     selected_tz = callback.data[3:]
-    if selected_tz not in ru_timezones:
+    if selected_tz not in valid_timezones:
         await callback.answer(t('start_invalid_data', lang))
         return
     data = await state.get_data()
@@ -142,7 +142,7 @@ async def start_tz_selection(callback: types.CallbackQuery, state: FSMContext, l
 @router.callback_query(SettingState.waiting_for_tz, F.data.startswith("tz_"))
 async def tz_selection_final(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession, lang: str = "ru"):
     selected_tz = callback.data[3:]
-    if selected_tz not in ru_timezones:
+    if selected_tz not in valid_timezones:
         await callback.answer(t('start_invalid_data', lang))
         return
     
